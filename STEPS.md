@@ -4,10 +4,11 @@
 >
 > Regra: **1 step = 1 commit**. Ao retomar o trabalho, rode `git log --oneline` para achar o último step concluído em vez de reler este arquivo inteiro ou o PLANO.md.
 
-**Estado atual:** Fases 0–3 completas e validadas (`npm run build` + `streamdeck validate` passam limpos). Próximo passo: Fase 4 (ícones finais + hardening). Desvios do plano original:
+**Estado atual:** Fases 0–4 completas e validadas (`npm run build` + `npm test` (23 testes) + `streamdeck validate` passam limpos). Próximo passo: Fase 5 (empacotamento + submissão). Desvios do plano original:
 - `streamdeck create` é wizard interativo sem flags não-interativas → scaffold montado manualmente na mesma estrutura oficial (confirmada via `@elgato/schemas`).
 - `status` (2.9) não usa o poller central — tem seu próprio timer, pois é diagnóstico independente (não faz sentido travar junto do cache de métricas).
-- Ícones das 8 actions core já existem como placeholders SVG (Fase 0.3, não Fase 4) para o manifest/build serem válidos desde o início; Fase 4.1 é a troca por arte final.
+- Ícones das 8 actions core já existem como placeholders SVG desde a Fase 0.3 (não só na Fase 4) para o manifest/build serem válidos desde o início; Fase 4.1 foi a revisão visual real (renderizados em headless Chrome no tamanho de 20px) + troca do ícone de "status" (gauge ilegível) por um pulso.
+- Fase 4.2/4.3: sem Stream Deck físico nem máquina Windows neste ambiente — testes manuais substituídos por testes automatizados (vitest, 23 testes) exercitando o `gh.ts` real contra scripts `gh` falsos, e a Fase 4.3 foi uma revisão de código focada (achou e corrigiu 1 bug real: caminho explícito do gh sem `.exe` no Windows). **Teste manual on-device (Stream Deck real + Windows) ainda pendente antes do lançamento.**
 
 ---
 
@@ -64,11 +65,11 @@ Referência de comando/UUID/ícone de cada uma: PLANO.md §1 tabela "v1 — Core
 
 ## Fase 4 — Hardening e assets visuais
 
-- [ ] **4.1** Ícones finais: plugin (256/512), categoria (28/56), 8 actions do core (20/40) — monocromático, sem logo do GitHub (PLANO.md §5).
+- [x] **4.1** Ícones finais: plugin (256/512), categoria (28/56), 8 actions do core (20/40) — monocromático, sem logo do GitHub (PLANO.md §5).
   commit: `chore: icones finais v1`
-- [ ] **4.2** Cobrir os 4 cenários de erro (§6) em todas as 8 actions + testes manuais.
+- [x] **4.2** Cobrir os 4 cenários de erro (§6) em todas as 8 actions + testes manuais.
   commit: `fix: cobertura de erros nas actions core`
-- [ ] **4.3** Teste cross-platform mac/Windows — corrigir divergências de PATH do `gh`.
+- [x] **4.3** Teste cross-platform mac/Windows — corrigir divergências de PATH do `gh`.
   commit: `fix: compatibilidade windows/mac`
 
 ## Fase 5 — Empacotamento e submissão

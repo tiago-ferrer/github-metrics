@@ -21,6 +21,12 @@ npm install
 npm run watch   # build + link + hot reload no Stream Deck
 ```
 
+## Testes
+
+```bash
+npm test
+```
+
 ## Empacotamento
 
 ```bash
