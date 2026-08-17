@@ -51,9 +51,11 @@ export abstract class SimpleMetricAction extends SingletonAction {
       if (error) await reportError(action, error);
       return;
     }
-    await action.setTitle(`${this.label()}\n${this.value(snapshot)}`);
+    const staleMark = error ? " ⚠" : "";
+    await action.setTitle(`${this.label()}\n${this.value(snapshot)}${staleMark}`);
     if (error) {
-      // Tem cache válido, mas a última atualização falhou: mantém o número e sinaliza discretamente.
+      // Tem cache válido, mas a última atualização falhou: mantém o número, marca "⚠" no título
+      // (indicador visual de desatualizado, PLANO.md §6) e loga para diagnóstico.
       streamDeck.logger.warn(`Exibindo cache desatualizado para ${this.label()}: ${error.message}`);
     }
   }

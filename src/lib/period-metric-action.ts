@@ -59,6 +59,11 @@ export abstract class PeriodMetricAction extends SingletonAction<PeriodActionSet
     const settings = await action.getSettings();
     const period = resolvePeriod(settings);
     const value = this.totals(snapshot)[period];
-    await action.setTitle(`${this.label()}\n${value}\n(${PERIOD_LABEL[period]})`);
+    const staleMark = error ? " ⚠" : "";
+    await action.setTitle(`${this.label()}\n${value}${staleMark}\n(${PERIOD_LABEL[period]})`);
+    if (error) {
+      // Cache válido, mas última atualização falhou: mantém o número, marca "⚠" (PLANO.md §6).
+      streamDeck.logger.warn(`Exibindo cache desatualizado para ${this.label()}: ${error.message}`);
+    }
   }
 }
