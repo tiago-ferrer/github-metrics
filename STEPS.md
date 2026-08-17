@@ -4,7 +4,7 @@
 >
 > Regra: **1 step = 1 commit**. Ao retomar o trabalho, rode `git log --oneline` para achar o último step concluído em vez de reler este arquivo inteiro ou o PLANO.md.
 
-**Estado atual:** Fases 0–4 completas e validadas (`npm run build` + `npm test` (23 testes) + `streamdeck validate` passam limpos). Próximo passo: Fase 5 (empacotamento + submissão). Desvios do plano original:
+**Estado atual:** Fases 0–5 completas, exceto a submissão em si (5.4, que depende de conta própria do usuário no Maker Console). `npm run build` + `npm test` (23 testes) + `streamdeck validate` + `npm run pack` (gera `.streamDeckPlugin` de verdade) passam limpos. v1 está tecnicamente pronta para submissão — falta só o usuário publicar a política de privacidade, capturar screenshots reais e criar a conta de Maker. Depois disso, Fase 6 (v1.1) é opcional/pós-lançamento. Desvios do plano original:
 - `streamdeck create` é wizard interativo sem flags não-interativas → scaffold montado manualmente na mesma estrutura oficial (confirmada via `@elgato/schemas`).
 - `status` (2.9) não usa o poller central — tem seu próprio timer, pois é diagnóstico independente (não faz sentido travar junto do cache de métricas).
 - Ícones das 8 actions core já existem como placeholders SVG desde a Fase 0.3 (não só na Fase 4) para o manifest/build serem válidos desde o início; Fase 4.1 foi a revisão visual real (renderizados em headless Chrome no tamanho de 20px) + troca do ícone de "status" (gauge ilegível) por um pulso.
@@ -74,13 +74,19 @@ Referência de comando/UUID/ícone de cada uma: PLANO.md §1 tabela "v1 — Core
 
 ## Fase 5 — Empacotamento e submissão
 
-- [ ] **5.1** `.sdignore` + `streamdeck pack` gerando `.streamDeckPlugin` válido.
-  commit: `chore: empacotamento`
-- [ ] **5.2** Política de privacidade (página pública) + descrição/screenshots da loja.
-  commit: `docs: assets de submissao`
-- [ ] **5.3** Confirmar exigência de assinatura/notarização junto à Elgato (PLANO.md §7) — ajustar build se necessário.
-  commit: `chore: assinatura de codigo` (se aplicável)
-- [ ] **5.4** Submeter no Maker Console. *(sem commit — processo externo; anotar feedback da revisão em `CHANGELOG.md` quando chegar)*
+- [x] **5.1** `.sdignore` + `streamdeck pack` gerando `.streamDeckPlugin` válido.
+  commit: `chore: empacotamento` — testado de verdade: gera zip de 331KB, 21 arquivos, sem lixo.
+- [x] **5.2** Política de privacidade + descrição/screenshots da loja.
+  commit: `docs: assets de submissao` — conteúdo em `docs/privacy-policy.md` e `docs/store-listing.md`.
+  **Pendente do usuário:** publicar a política de privacidade numa URL pública e capturar os
+  screenshots reais (não simulados aqui — não há Stream Deck físico neste ambiente).
+- [x] **5.3** Confirmar exigência de assinatura/notarização junto à Elgato — **resolvido via pesquisa** (documentado no commit `a4644aa`): a proteção/DRM é aplicada pelo Maker Console *depois* do upload, não localmente por `streamdeck pack`; não há menção pública a certificado próprio exigido do maker. Sem mudança de código necessária. Vale confirmar no onboarding do Maker Console como checagem final.
+- [ ] **5.4** Submeter no Maker Console. **Requer conta própria do usuário em maker.elgato.com — não pode ser feito por aqui.** Passo a passo:
+  1. Criar conta em maker.elgato.com.
+  2. Preencher o formulário do produto com o conteúdo de `docs/store-listing.md`.
+  3. Upload do `com.tiagoferrer.githubmetrics.streamDeckPlugin` (gerar de novo com `npm run pack` se o código mudou).
+  4. Aguardar revisão.
+  *(sem commit — processo externo; ao receber feedback da revisão, criar `CHANGELOG.md` e registrar o resultado/ajustes pedidos.)*
 
 ## Fase 6 — v1.1 (pós-lançamento)
 
