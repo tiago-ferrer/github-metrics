@@ -13,5 +13,13 @@ export default {
     sourcemap: isWatch,
     sourcemapPathTransform: (relativeSourcePath) => `../../${relativeSourcePath}`,
   },
-  plugins: [nodeResolve(), commonjs(), typescript({ tsconfig: "./tsconfig.json" })],
+  plugins: [
+    nodeResolve(),
+    commonjs(),
+    typescript({
+      tsconfig: "./tsconfig.json",
+      compilerOptions: { outDir: undefined, declaration: false, declarationDir: undefined },
+      sourceMap: isWatch,
+    }),
+  ],
 };
