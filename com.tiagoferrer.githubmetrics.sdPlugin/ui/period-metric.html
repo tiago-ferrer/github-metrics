@@ -1,0 +1,46 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="pi-common.css" />
+  </head>
+  <body>
+    <h1>Esta action</h1>
+    <div class="field">
+      <label for="period">Período</label>
+      <select id="period" data-setting="period">
+        <option value="hoje">Hoje</option>
+        <option value="semana">Última semana</option>
+        <option value="mes">Último mês</option>
+        <option value="ano">Último ano</option>
+      </select>
+    </div>
+
+    <h1>Conta GitHub</h1>
+    <div class="field">
+      <label for="githubUsername">Usuário</label>
+      <input id="githubUsername" type="text" placeholder="detectado automaticamente" data-global-setting="githubUsername" />
+    </div>
+
+    <h1>Avançado</h1>
+    <div class="field">
+      <label for="ghBinaryPath">Caminho do gh</label>
+      <input id="ghBinaryPath" type="text" placeholder="gh" data-global-setting="ghBinaryPath" />
+    </div>
+    <div class="field">
+      <label for="refreshIntervalSeconds">Refresh (segundos)</label>
+      <input
+        id="refreshIntervalSeconds"
+        type="number"
+        min="30"
+        step="10"
+        placeholder="60"
+        data-global-setting="refreshIntervalSeconds"
+        data-type="number"
+      />
+    </div>
+    <p class="hint">Usuário, caminho do gh e refresh são globais (valem para todas as actions).</p>
+
+    <script src="pi-common.js"></script>
+  </body>
+</html>
