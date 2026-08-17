@@ -21,10 +21,25 @@ export class GhError extends Error {
   }
 }
 
+/**
+ * No Windows, quando o comando é um nome "solto" (ex.: "gh"), o libuv já resolve a extensão
+ * certa via PATH + PATHEXT automaticamente — mesmo sem shell. Mas quando o usuário informa um
+ * caminho explícito (contém separador de diretório) sem extensão, o Windows NÃO faz essa busca
+ * de extensão (isso só vale para lookup por PATH) e a chamada falha com ENOENT mesmo que
+ * `gh.exe` exista ali. Ver PLANO.md §9 (risco: localização do gh no PATH no Windows).
+ */
+export function normalizeGhBinaryPath(customPath: string, platform: NodeJS.Platform = process.platform): string {
+  if (platform !== "win32") return customPath;
+  const looksLikeExplicitPath = /[\\/]/.test(customPath);
+  const hasExtension = /\.[a-z0-9]+$/i.test(customPath);
+  return looksLikeExplicitPath && !hasExtension ? `${customPath}.exe` : customPath;
+}
+
 async function resolveGhBinary(): Promise<string> {
   const settings = await streamDeck.settings.getGlobalSettings<GlobalSettings>();
   const custom = settings.ghBinaryPath?.trim();
-  return custom && custom.length > 0 ? custom : "gh";
+  if (!custom) return "gh";
+  return normalizeGhBinaryPath(custom);
 }
 
 function classifyError(err: unknown): GhError {

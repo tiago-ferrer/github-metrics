@@ -16,7 +16,7 @@ vi.mock("@elgato/streamdeck", () => ({
   },
 }));
 
-const { runGh, GhError } = await import("./gh.js");
+const { runGh, GhError, normalizeGhBinaryPath } = await import("./gh.js");
 
 beforeEach(() => {
   mockGlobalSettings = {};
@@ -60,5 +60,34 @@ describe("runGh — classificação de erros", () => {
   it("todos os erros são instâncias de GhError", async () => {
     mockGlobalSettings = { ghBinaryPath: fixture("gh-unknown-error.sh") };
     await expect(runGh(["api", "user"])).rejects.toBeInstanceOf(GhError);
+  });
+});
+
+/**
+ * PLANO.md §9 — no Windows, um caminho explícito (com separador) sem extensão NÃO é resolvido
+ * via PATHEXT pelo Windows (isso só vale para nome de comando "solto" via PATH), então precisa
+ * do ".exe" anexado manualmente. Testado explicitamente para win32 e macOS/Linux (sem alterar
+ * process.platform de verdade — o parâmetro é injetável).
+ */
+describe("normalizeGhBinaryPath — compatibilidade Windows", () => {
+  it("anexa .exe a um caminho explícito sem extensão no Windows", () => {
+    expect(normalizeGhBinaryPath("C:\\Program Files\\GitHub CLI\\gh", "win32")).toBe(
+      "C:\\Program Files\\GitHub CLI\\gh.exe",
+    );
+  });
+
+  it("não mexe em caminho que já tem extensão no Windows", () => {
+    expect(normalizeGhBinaryPath("C:\\Program Files\\GitHub CLI\\gh.exe", "win32")).toBe(
+      "C:\\Program Files\\GitHub CLI\\gh.exe",
+    );
+  });
+
+  it("não mexe em comando solto (sem separador) no Windows — resolvido via PATH/PATHEXT pelo libuv", () => {
+    expect(normalizeGhBinaryPath("gh", "win32")).toBe("gh");
+  });
+
+  it("não altera nada fora do Windows", () => {
+    expect(normalizeGhBinaryPath("/usr/local/bin/gh", "darwin")).toBe("/usr/local/bin/gh");
+    expect(normalizeGhBinaryPath("/usr/local/bin/gh", "linux")).toBe("/usr/local/bin/gh");
   });
 });
