@@ -17,13 +17,14 @@ import { metricsPoller } from "./poller.js";
  */
 export abstract class SimpleMetricAction extends SingletonAction {
   #unsubscribers = new Map<string, () => void>();
+  #latestSnapshot: MetricsSnapshot | null = null;
 
   /** Rótulo curto exibido acima do número (ex.: "PRs"). */
   protected abstract label(): string;
   /** Extrai o valor a exibir a partir do snapshot mais recente. */
   protected abstract value(snapshot: MetricsSnapshot): number;
   /** URL aberta no navegador ao pressionar a tecla. */
-  protected abstract url(): string;
+  protected abstract url(snapshot: MetricsSnapshot | null): string;
 
   override onWillAppear(ev: WillAppearEvent): void {
     if (!ev.action.isKey()) return;
@@ -40,11 +41,12 @@ export abstract class SimpleMetricAction extends SingletonAction {
   }
 
   override async onKeyDown(ev: KeyDownEvent): Promise<void> {
-    await streamDeck.system.openUrl(this.url());
+    await streamDeck.system.openUrl(this.url(this.#latestSnapshot));
     if (ev.action.isKey()) await ev.action.showOk();
   }
 
   async #render(action: KeyAction, snapshot: MetricsSnapshot | null, error: GhError | null): Promise<void> {
+    if (snapshot) this.#latestSnapshot = snapshot;
     if (!snapshot) {
       if (error) await reportError(action, error);
       return;

@@ -7,6 +7,7 @@ import { IssuesAssignedAction } from "./issues-assigned.js";
 import { NotificationsAction } from "./notifications.js";
 import { CommitsAction } from "./commits.js";
 import { ReviewsDoneAction } from "./reviews-done.js";
+import { StarsReceivedAction } from "./stars-received.js";
 
 streamDeck.actions.registerAction(new PrsOpenAction());
 streamDeck.actions.registerAction(new ReviewRequestedAction());
@@ -14,3 +15,4 @@ streamDeck.actions.registerAction(new IssuesAssignedAction());
 streamDeck.actions.registerAction(new NotificationsAction());
 streamDeck.actions.registerAction(new CommitsAction());
 streamDeck.actions.registerAction(new ReviewsDoneAction());
+streamDeck.actions.registerAction(new StarsReceivedAction());
