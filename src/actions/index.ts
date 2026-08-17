@@ -2,5 +2,7 @@
 // ao ser importado (decorator @action). Preenchido incrementalmente na Fase 2 do STEPS.md.
 import streamDeck from "@elgato/streamdeck";
 import { PrsOpenAction } from "./prs-open.js";
+import { ReviewRequestedAction } from "./review-requested.js";
 
 streamDeck.actions.registerAction(new PrsOpenAction());
+streamDeck.actions.registerAction(new ReviewRequestedAction());
