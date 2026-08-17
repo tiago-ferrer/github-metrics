@@ -15,8 +15,14 @@
     "MinimumVersion": "7.1"
   },
   "OS": [
-    { "Platform": "mac", "MinimumVersion": "13" },
-    { "Platform": "windows", "MinimumVersion": "10" }
+    {
+      "Platform": "mac",
+      "MinimumVersion": "13"
+    },
+    {
+      "Platform": "windows",
+      "MinimumVersion": "10"
+    }
   ],
   "Nodejs": {
     "Version": "24",
@@ -29,9 +35,15 @@
       "Tooltip": "Quantidade de Pull Requests abertas por você",
       "Icon": "imgs/actions/prs-open/icon",
       "PropertyInspectorPath": "ui/simple-metric.html",
-      "Controllers": ["Keypad"],
+      "Controllers": [
+        "Keypad"
+      ],
       "States": [
-        { "Image": "imgs/actions/prs-open/icon", "TitleAlignment": "bottom", "FontSize": 16 }
+        {
+          "Image": "imgs/actions/prs-open/icon",
+          "TitleAlignment": "bottom",
+          "FontSize": 16
+        }
       ]
     },
     {
@@ -40,9 +52,15 @@
       "Tooltip": "PRs aguardando sua review",
       "Icon": "imgs/actions/review-requested/icon",
       "PropertyInspectorPath": "ui/simple-metric.html",
-      "Controllers": ["Keypad"],
+      "Controllers": [
+        "Keypad"
+      ],
       "States": [
-        { "Image": "imgs/actions/review-requested/icon", "TitleAlignment": "bottom", "FontSize": 16 }
+        {
+          "Image": "imgs/actions/review-requested/icon",
+          "TitleAlignment": "bottom",
+          "FontSize": 16
+        }
       ]
     },
     {
@@ -51,9 +69,15 @@
       "Tooltip": "Issues abertas atribuídas a você",
       "Icon": "imgs/actions/issues-assigned/icon",
       "PropertyInspectorPath": "ui/simple-metric.html",
-      "Controllers": ["Keypad"],
+      "Controllers": [
+        "Keypad"
+      ],
       "States": [
-        { "Image": "imgs/actions/issues-assigned/icon", "TitleAlignment": "bottom", "FontSize": 16 }
+        {
+          "Image": "imgs/actions/issues-assigned/icon",
+          "TitleAlignment": "bottom",
+          "FontSize": 16
+        }
       ]
     },
     {
@@ -62,9 +86,15 @@
       "Tooltip": "Notificações não lidas",
       "Icon": "imgs/actions/notifications/icon",
       "PropertyInspectorPath": "ui/simple-metric.html",
-      "Controllers": ["Keypad"],
+      "Controllers": [
+        "Keypad"
+      ],
       "States": [
-        { "Image": "imgs/actions/notifications/icon", "TitleAlignment": "bottom", "FontSize": 16 }
+        {
+          "Image": "imgs/actions/notifications/icon",
+          "TitleAlignment": "bottom",
+          "FontSize": 16
+        }
       ]
     },
     {
@@ -73,9 +103,15 @@
       "Tooltip": "Commits contribuídos no período selecionado",
       "Icon": "imgs/actions/commits/icon",
       "PropertyInspectorPath": "ui/period-metric.html",
-      "Controllers": ["Keypad"],
+      "Controllers": [
+        "Keypad"
+      ],
       "States": [
-        { "Image": "imgs/actions/commits/icon", "TitleAlignment": "bottom", "FontSize": 14 }
+        {
+          "Image": "imgs/actions/commits/icon",
+          "TitleAlignment": "bottom",
+          "FontSize": 14
+        }
       ]
     },
     {
@@ -84,9 +120,15 @@
       "Tooltip": "Reviews de PR realizadas no período selecionado",
       "Icon": "imgs/actions/reviews-done/icon",
       "PropertyInspectorPath": "ui/period-metric.html",
-      "Controllers": ["Keypad"],
+      "Controllers": [
+        "Keypad"
+      ],
       "States": [
-        { "Image": "imgs/actions/reviews-done/icon", "TitleAlignment": "bottom", "FontSize": 14 }
+        {
+          "Image": "imgs/actions/reviews-done/icon",
+          "TitleAlignment": "bottom",
+          "FontSize": 14
+        }
       ]
     },
     {
@@ -95,9 +137,15 @@
       "Tooltip": "Total de estrelas nos seus repositórios",
       "Icon": "imgs/actions/stars-received/icon",
       "PropertyInspectorPath": "ui/simple-metric.html",
-      "Controllers": ["Keypad"],
+      "Controllers": [
+        "Keypad"
+      ],
       "States": [
-        { "Image": "imgs/actions/stars-received/icon", "TitleAlignment": "bottom", "FontSize": 16 }
+        {
+          "Image": "imgs/actions/stars-received/icon",
+          "TitleAlignment": "bottom",
+          "FontSize": 16
+        }
       ]
     },
     {
@@ -106,10 +154,20 @@
       "Tooltip": "Diagnóstico: autenticação do gh e rate limit da API",
       "Icon": "imgs/actions/status/icon",
       "PropertyInspectorPath": "ui/status.html",
-      "Controllers": ["Keypad"],
+      "Controllers": [
+        "Keypad"
+      ],
       "States": [
-        { "Image": "imgs/actions/status/ok", "Name": "OK", "TitleAlignment": "bottom" },
-        { "Image": "imgs/actions/status/error", "Name": "Erro", "TitleAlignment": "bottom" }
+        {
+          "Image": "imgs/actions/status/ok",
+          "Name": "OK",
+          "TitleAlignment": "bottom"
+        },
+        {
+          "Image": "imgs/actions/status/error",
+          "Name": "Erro",
+          "TitleAlignment": "bottom"
+        }
       ]
     }
   ]

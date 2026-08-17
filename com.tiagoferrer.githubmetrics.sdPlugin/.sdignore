@@ -1,0 +1,5 @@
+# Arquivos excluídos do .streamDeckPlugin gerado por `streamdeck pack` (sintaxe gitignore).
+.DS_Store
+*.log
+logs/
+**/*.map
