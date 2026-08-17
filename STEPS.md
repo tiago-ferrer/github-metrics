@@ -87,7 +87,7 @@ Referência de comando/UUID/ícone de cada uma: PLANO.md §1 tabela "v1 — Core
 - [ ] **5.4** Submeter no Maker Console. **Requer conta própria do usuário em maker.elgato.com — não pode ser feito por aqui.** Passo a passo:
   1. Criar conta em maker.elgato.com.
   2. Preencher o formulário do produto com o conteúdo de `docs/store-listing.md`.
-  3. Upload do `com.tiagoferrer.githubmetrics.streamDeckPlugin` (gerar de novo com `npm run pack` se o código mudou).
+  3. Upload do `dev.tferrer.githubmetrics.streamDeckPlugin` (gerar de novo com `npm run pack` se o código mudou).
   4. Aguardar revisão.
   *(sem commit — processo externo; ao receber feedback da revisão, criar `CHANGELOG.md` e registrar o resultado/ajustes pedidos.)*
 

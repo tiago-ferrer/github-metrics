@@ -2,7 +2,7 @@ import { action } from "@elgato/streamdeck";
 import { SimpleMetricAction } from "../lib/simple-metric-action.js";
 import type { MetricsSnapshot } from "../lib/metrics.js";
 
-@action({ UUID: "com.tiagoferrer.githubmetrics.issues-assigned" })
+@action({ UUID: "dev.tferrer.githubmetrics.issues-assigned" })
 export class IssuesAssignedAction extends SimpleMetricAction {
   protected label(): string {
     return "Issues";

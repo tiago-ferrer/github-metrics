@@ -34,4 +34,4 @@ npm run validate
 npm run pack
 ```
 
-Gera `com.tiagoferrer.githubmetrics.streamDeckPlugin`.
+Gera `dev.tferrer.githubmetrics.streamDeckPlugin`.

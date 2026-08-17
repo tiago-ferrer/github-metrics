@@ -32,7 +32,7 @@ async function checkStatus(): Promise<AuthCheck> {
  * central de métricas (PLANO.md §1, action "Status da Conta") — falha aqui explica por que as
  * outras 7 actions podem estar mostrando erro.
  */
-@action({ UUID: "com.tiagoferrer.githubmetrics.status" })
+@action({ UUID: "dev.tferrer.githubmetrics.status" })
 export class StatusAction extends SingletonAction {
   #timers = new Map<string, ReturnType<typeof setInterval>>();
 

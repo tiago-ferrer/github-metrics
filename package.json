@@ -6,9 +6,9 @@
   "description": "Plugin de Stream Deck com métricas gerais da conta GitHub do usuário, coletadas via gh CLI local.",
   "scripts": {
     "build": "rollup -c",
-    "watch": "rollup -c -w --watch.onEnd=\"streamdeck restart com.tiagoferrer.githubmetrics\"",
-    "validate": "streamdeck validate com.tiagoferrer.githubmetrics.sdPlugin",
-    "pack": "streamdeck pack com.tiagoferrer.githubmetrics.sdPlugin",
+    "watch": "rollup -c -w --watch.onEnd=\"streamdeck restart dev.tferrer.githubmetrics\"",
+    "validate": "streamdeck validate dev.tferrer.githubmetrics.sdPlugin",
+    "pack": "streamdeck pack dev.tferrer.githubmetrics.sdPlugin",
     "test": "vitest run"
   },
   "devDependencies": {

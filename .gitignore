@@ -1,7 +1,7 @@
 node_modules/
 dist/
 *.streamDeckPlugin
-com.tiagoferrer.githubmetrics.sdPlugin/bin/
-com.tiagoferrer.githubmetrics.sdPlugin/logs/
+dev.tferrer.githubmetrics.sdPlugin/bin/
+dev.tferrer.githubmetrics.sdPlugin/logs/
 .DS_Store
 *.log

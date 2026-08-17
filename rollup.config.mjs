@@ -3,7 +3,7 @@ import commonjs from "@rollup/plugin-commonjs";
 import typescript from "@rollup/plugin-typescript";
 
 const isWatch = !!process.env.ROLLUP_WATCH;
-const sdPlugin = "com.tiagoferrer.githubmetrics.sdPlugin";
+const sdPlugin = "dev.tferrer.githubmetrics.sdPlugin";
 
 export default {
   input: "src/plugin.ts",

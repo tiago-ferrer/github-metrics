@@ -1,6 +1,6 @@
 {
   "$schema": "https://schemas.elgato.com/streamdeck/plugins/manifest.json",
-  "UUID": "com.tiagoferrer.githubmetrics",
+  "UUID": "dev.tferrer.githubmetrics",
   "Name": "GitHub Metrics",
   "Version": "0.1.0.0",
   "Author": "Tiago Ferrer",
@@ -30,7 +30,7 @@
   },
   "Actions": [
     {
-      "UUID": "com.tiagoferrer.githubmetrics.prs-open",
+      "UUID": "dev.tferrer.githubmetrics.prs-open",
       "Name": "PRs Abertas",
       "Tooltip": "Quantidade de Pull Requests abertas por você",
       "Icon": "imgs/actions/prs-open/icon",
@@ -47,7 +47,7 @@
       ]
     },
     {
-      "UUID": "com.tiagoferrer.githubmetrics.review-requested",
+      "UUID": "dev.tferrer.githubmetrics.review-requested",
       "Name": "Review Solicitada",
       "Tooltip": "PRs aguardando sua review",
       "Icon": "imgs/actions/review-requested/icon",
@@ -64,7 +64,7 @@
       ]
     },
     {
-      "UUID": "com.tiagoferrer.githubmetrics.issues-assigned",
+      "UUID": "dev.tferrer.githubmetrics.issues-assigned",
       "Name": "Issues Atribuídas",
       "Tooltip": "Issues abertas atribuídas a você",
       "Icon": "imgs/actions/issues-assigned/icon",
@@ -81,7 +81,7 @@
       ]
     },
     {
-      "UUID": "com.tiagoferrer.githubmetrics.notifications",
+      "UUID": "dev.tferrer.githubmetrics.notifications",
       "Name": "Notificações",
       "Tooltip": "Notificações não lidas",
       "Icon": "imgs/actions/notifications/icon",
@@ -98,7 +98,7 @@
       ]
     },
     {
-      "UUID": "com.tiagoferrer.githubmetrics.commits",
+      "UUID": "dev.tferrer.githubmetrics.commits",
       "Name": "Commits",
       "Tooltip": "Commits contribuídos no período selecionado",
       "Icon": "imgs/actions/commits/icon",
@@ -115,7 +115,7 @@
       ]
     },
     {
-      "UUID": "com.tiagoferrer.githubmetrics.reviews-done",
+      "UUID": "dev.tferrer.githubmetrics.reviews-done",
       "Name": "Reviews Feitas",
       "Tooltip": "Reviews de PR realizadas no período selecionado",
       "Icon": "imgs/actions/reviews-done/icon",
@@ -132,7 +132,7 @@
       ]
     },
     {
-      "UUID": "com.tiagoferrer.githubmetrics.stars-received",
+      "UUID": "dev.tferrer.githubmetrics.stars-received",
       "Name": "Estrelas Recebidas",
       "Tooltip": "Total de estrelas nos seus repositórios",
       "Icon": "imgs/actions/stars-received/icon",
@@ -149,7 +149,7 @@
       ]
     },
     {
-      "UUID": "com.tiagoferrer.githubmetrics.status",
+      "UUID": "dev.tferrer.githubmetrics.status",
       "Name": "Status da Conta",
       "Tooltip": "Diagnóstico: autenticação do gh e rate limit da API",
       "Icon": "imgs/actions/status/icon",

@@ -2,7 +2,7 @@ import { action } from "@elgato/streamdeck";
 import { PeriodMetricAction } from "../lib/period-metric-action.js";
 import type { MetricsSnapshot, PeriodTotals } from "../lib/metrics.js";
 
-@action({ UUID: "com.tiagoferrer.githubmetrics.reviews-done" })
+@action({ UUID: "dev.tferrer.githubmetrics.reviews-done" })
 export class ReviewsDoneAction extends PeriodMetricAction {
   protected label(): string {
     return "Reviews";
