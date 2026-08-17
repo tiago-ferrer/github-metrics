@@ -1,0 +1,24 @@
+{
+  "name": "github-metrics-streamdeck-plugin",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Plugin de Stream Deck com métricas gerais da conta GitHub do usuário, coletadas via gh CLI local.",
+  "scripts": {
+    "build": "rollup -c",
+    "watch": "rollup -c -w",
+    "validate": "streamdeck validate com.tiagoferrer.githubmetrics.sdPlugin",
+    "pack": "streamdeck pack com.tiagoferrer.githubmetrics.sdPlugin"
+  },
+  "devDependencies": {
+    "@elgato/cli": "^1.8.1",
+    "@rollup/plugin-commonjs": "^28.0.0",
+    "@rollup/plugin-node-resolve": "^16.0.0",
+    "@rollup/plugin-typescript": "^12.0.0",
+    "rollup": "^4.24.0",
+    "typescript": "^5.6.0"
+  },
+  "dependencies": {
+    "@elgato/streamdeck": "^2.1.2"
+  }
+}
