@@ -1,0 +1,23 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="pi-common.css" />
+  </head>
+  <body>
+    <h1>Diagnóstico</h1>
+    <p class="hint">
+      Mostra se o <code>gh</code> está instalado, autenticado, e quantas chamadas de API ainda restam
+      no rate limit. Pressione a tecla a qualquer momento para forçar uma nova checagem.
+    </p>
+
+    <h1>Avançado</h1>
+    <div class="field">
+      <label for="ghBinaryPath">Caminho do gh</label>
+      <input id="ghBinaryPath" type="text" placeholder="gh" data-global-setting="ghBinaryPath" />
+    </div>
+    <p class="hint">Configure aqui se o <code>gh</code> não estiver no PATH do processo do Stream Deck.</p>
+
+    <script src="pi-common.js"></script>
+  </body>
+</html>
