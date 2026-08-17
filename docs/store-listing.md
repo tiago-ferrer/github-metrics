@@ -50,8 +50,19 @@ Configurável:
 
 ## Preço
 
-Gratuito — o plugin roda inteiramente sobre a conta/autenticação do próprio usuário; não há
-custo de infraestrutura do lado do desenvolvedor a recuperar.
+**US$ 5,00** (decisão do usuário — atualizado em 2026-08-17).
+
+Split da Marketplace é 70/30 (você fica com 70%): de cada venda de US$ 5, você recebe
+**≈ US$ 3,50**, pago via Stripe Connect. Detalhes: [Revenue Share](https://docs.elgato.com/monetization/revenue-share/).
+
+⚠️ **Importante:** segundo a documentação oficial, "o nome do produto e as opções de
+monetização não podem ser alterados no Maker Console" depois de submetidos — mudar de preço
+(ou de pago para gratuito) depois exige contato direto com `maker@elgato.com`. Confirme o valor
+antes de enviar.
+
+⚠️ Produtos pagos exigem que o seu país seja suportado pelo Stripe Connect — confirme em
+[stripe.com/global](https://stripe.com/global) antes de configurar o preço; se não for
+suportado, só dá pra listar como gratuito.
 
 ## URL de suporte
 
@@ -62,26 +73,39 @@ custo de infraestrutura do lado do desenvolvedor a recuperar.
 Ver [`privacy-policy.md`](./privacy-policy.md). Publicar em uma URL pública antes da submissão
 (GitHub Pages, ou como Artifact) e colar o link aqui: `[preencher]`.
 
-## Screenshots / itens de galeria (a capturar manualmente, com o plugin rodando de verdade)
+## Mídia exigida (specs oficiais do Maker Console)
 
-Não há Stream Deck físico neste ambiente de desenvolvimento — as imagens abaixo precisam ser
-capturadas manualmente pelo usuário antes da submissão. Roteiro sugerido:
+Já que o plugin roda de verdade nesta máquina, dá pra capturar essas imagens com o app do
+Stream Deck aberto de verdade — nada aqui precisa ser simulado.
 
-1. **Visão geral**: um perfil do Stream Deck com as 8 actions do core organizadas (2 fileiras
-   de 4), mostrando números reais.
-2. **Property Inspector — período**: captura da tela de configuração da action "Commits" com o
-   dropdown de período aberto.
-3. **Ação "Status da Conta"**: uma captura no estado OK (verde) e outra simulando o estado de
-   erro (vermelho/alerta), para mostrar o diagnóstico funcionando.
-4. **Close-up dos ícones**: grid dos 8 ícones da action list (o `contact_sheet.png` gerado
-   durante a Fase 4 pode servir de referência de composição, mas não deve ser usado como
-   screenshot final — é só um teste de legibilidade, não arte de produto).
+| Item | Especificação | Conteúdo sugerido |
+|---|---|---|
+| Thumbnail (obrigatório) | 1920×960 px, PNG | Perfil com as 8 actions do core organizadas, números reais visíveis |
+| Galeria — item 1 (mín. 3 exigidos) | 1920×960 PNG **ou** 1920×1080 MP4 | Mesmo perfil, com destaque num close-up das teclas |
+| Galeria — item 2 | idem | Property Inspector da action "Commits" com o dropdown de período aberto |
+| Galeria — item 3 | idem | Action "Status da Conta" em OK (verde) — se der, uma segunda mostrando o estado de erro |
+| App icon (Maker Console) | conforme `imgs/plugin/icon.png`/`icon@2x.png` já existentes no `.sdPlugin` | reaproveitar |
+
+`docs/icon-preview` (gerado na Fase 4) é só teste de legibilidade dos ícones — não usar como
+screenshot final de produto.
+
+## Passo a passo real de submissão (3 etapas do Maker Console)
+
+1. **Files** — sobe o `.streamDeckPlugin` (gerar com `npm run pack` se o código mudou desde o
+   último build).
+2. **Details** — nome, descrição (usar o texto acima, com palavras-chave pra busca), categoria,
+   tags, **preço (US$ 5,00)**, links.
+3. **Media & Release Notes** — thumbnail + 3 itens de galeria (tabela acima) + notas da versão
+   (ex.: "v0.1.0 — lançamento inicial: 8 métricas core da conta GitHub via gh CLI").
 
 ## Checklist antes de submeter
 
 - [ ] Substituir `[preencher]` acima (URL de suporte, URL da política de privacidade).
-- [ ] Capturar os screenshots reais listados acima.
-- [ ] Criar conta de Maker em maker.elgato.com.
+- [ ] Capturar a mídia real listada acima (thumbnail + 3 itens de galeria).
+- [ ] Criar organização em maker.elgato.com e assinar o Maker Agreement.
+- [ ] Configurar o Stripe Connect (Monetization → Stripe) — necessário para receber pagamentos
+      de produto pago; confirmar que o seu país é suportado antes de fixar o preço.
+- [ ] Confirmar o preço (US$ 5,00) — **não dá pra mudar depois sem contatar `maker@elgato.com`**.
 - [ ] Confirmar com o suporte da Elgato se algum passo adicional de assinatura/certificado é
       necessário para o SO Windows (ver STEPS.md, item 5.3 — documentação pública não menciona
       isso, mas vale confirmar no onboarding).
