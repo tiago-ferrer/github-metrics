@@ -10,7 +10,7 @@
   "Icon": "imgs/plugin/icon",
   "CodePath": "bin/plugin.js",
   "PropertyInspectorPath": "ui/simple-metric.html",
-  "SDKVersion": 2,
+  "SDKVersion": 3,
   "Software": {
     "MinimumVersion": "7.1"
   },
