@@ -73,21 +73,29 @@ suportado, só dá pra listar como gratuito.
 Ver [`privacy-policy.md`](./privacy-policy.md). Publicar em uma URL pública antes da submissão
 (GitHub Pages, ou como Artifact) e colar o link aqui: `[preencher]`.
 
-## Mídia exigida (specs oficiais do Maker Console)
+## Mídia — pronta em `docs/media/`
 
-Já que o plugin roda de verdade nesta máquina, dá pra capturar essas imagens com o app do
-Stream Deck aberto de verdade — nada aqui precisa ser simulado.
-
-| Item | Especificação | Conteúdo sugerido |
+| Arquivo | Uso no Maker Console | Especificação |
 |---|---|---|
-| Thumbnail (obrigatório) | 1920×960 px, PNG | Perfil com as 8 actions do core organizadas, números reais visíveis |
-| Galeria — item 1 (mín. 3 exigidos) | 1920×960 PNG **ou** 1920×1080 MP4 | Mesmo perfil, com destaque num close-up das teclas |
-| Galeria — item 2 | idem | Property Inspector da action "Commits" com o dropdown de período aberto |
-| Galeria — item 3 | idem | Action "Status da Conta" em OK (verde) — se der, uma segunda mostrando o estado de erro |
-| App icon (Maker Console) | conforme `imgs/plugin/icon.png`/`icon@2x.png` já existentes no `.sdPlugin` | reaproveitar |
+| `docs/media/thumbnail.png` | Thumbnail (obrigatório) | 1920×960 px PNG ✅ |
+| `docs/media/gallery-1-overview.png` | Galeria — item 1 | 1920×960 px PNG ✅ |
+| `docs/media/gallery-2-config.png` | Galeria — item 2 | 1920×960 px PNG ✅ |
+| `docs/media/gallery-3-status.png` | Galeria — item 3 | 1920×960 px PNG ✅ |
+| App icon (Maker Console) | `imgs/plugin/icon.png`/`icon@2x.png`, já existentes no `.sdPlugin` | reaproveitar |
 
-`docs/icon-preview` (gerado na Fase 4) é só teste de legibilidade dos ícones — não usar como
-screenshot final de produto.
+**Importante sobre a origem dessas imagens:** não são capturas de tela literais do app da
+Elgato (não tenho acesso ao display desta máquina para capturar a tela). São **artes de produto
+originais**, montadas em HTML/CSS e renderizadas via headless Chrome, usando dados 100% reais do
+plugin:
+- Os 8 ícones das actions são os arquivos SVG reais do `.sdPlugin`.
+- A imagem `gallery-2-config.png` embute uma **captura real** do nosso próprio arquivo
+  `ui/period-metric.html` (o Property Inspector de verdade, renderizado sem dados fake — só sem
+  preenchimento porque roda fora do app).
+- Os números nas teclas (ex.: "3 PRs", "128 estrelas") são **exemplos ilustrativos**, não uma
+  conta real — isso é normal para material de marketing, mas fique ciente disso.
+
+Se preferir, dá pra trocar por screenshots reais do app depois — é só substituir os arquivos em
+`docs/media/` mantendo os mesmos nomes/dimensões.
 
 ## Passo a passo real de submissão (3 etapas do Maker Console)
 
@@ -101,7 +109,7 @@ screenshot final de produto.
 ## Checklist antes de submeter
 
 - [ ] Substituir `[preencher]` acima (URL de suporte, URL da política de privacidade).
-- [ ] Capturar a mídia real listada acima (thumbnail + 3 itens de galeria).
+- [x] Mídia pronta em `docs/media/` (thumbnail + 3 itens de galeria) — arte de produto original, ver nota acima sobre a origem.
 - [ ] Criar organização em maker.elgato.com e assinar o Maker Agreement.
 - [ ] Configurar o Stripe Connect (Monetization → Stripe) — necessário para receber pagamentos
       de produto pago; confirmar que o seu país é suportado antes de fixar o preço.
