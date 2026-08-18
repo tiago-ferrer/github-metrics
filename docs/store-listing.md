@@ -103,8 +103,36 @@ Se preferir, dá pra trocar por screenshots reais do app depois — é só subst
    último build).
 2. **Details** — nome, descrição (usar o texto acima, com palavras-chave pra busca), categoria,
    tags, **preço (US$ 5,00)**, links.
-3. **Media & Release Notes** — thumbnail + 3 itens de galeria (tabela acima) + notas da versão
-   (ex.: "v0.1.0 — lançamento inicial: 8 métricas core da conta GitHub via gh CLI").
+3. **Media & Release Notes** — thumbnail + 3 itens de galeria (seção acima) + notas da versão
+   (texto abaixo, pronto pra colar — 995/1500 caracteres).
+
+## Release Notes (v0.1.0)
+
+```
+GitHub Metrics v0.1.0 — Initial Release
+
+See your GitHub account at a glance, right on your Stream Deck.
+
+8 core actions:
+• Open PRs (authored by you)
+• PRs awaiting your review
+• Issues assigned to you
+• Unread notifications
+• Commits (today / week / month / year)
+• PR reviews completed (today / week / month / year)
+• Stars received across your repositories
+• Account status (gh auth + API rate limit diagnostics)
+
+Unlike plugins tied to a single repository, GitHub Metrics gives you the aggregated view of your whole account — not one project.
+
+How it works: uses the GitHub CLI (gh) already installed and authenticated on your machine. No token passes through the plugin or any third-party server — all communication happens directly between your computer and GitHub.
+
+Requirements:
+• GitHub CLI installed (cli.github.com)
+• Authenticated via "gh auth login"
+
+Configurable: GitHub username (auto-detected), refresh interval, and time period (today/week/month/year) for Commits and Reviews.
+```
 
 ## Checklist antes de submeter
 
