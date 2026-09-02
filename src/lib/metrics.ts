@@ -73,26 +73,47 @@ function isoDaysAgo(days: number): string {
   return d.toISOString();
 }
 
-async function fetchPrsOpenCount(createdFrom: string, owner?: string): Promise<number> {
-  const args = ["search", "prs", "--author=@me", "--state=open", `--created=>=${createdFrom}`];
-  if (owner) args.push(`--owner=${owner}`);
-  return countSearch(args);
+function daysAgoMs(days: number): number {
+  return Date.now() - days * 24 * 60 * 60 * 1000;
 }
+
+function startOfTodayUtcMs(): number {
+  const d = new Date();
+  d.setUTCHours(0, 0, 0, 0);
+  return d.getTime();
+}
+
+type CreatedAtItem = { createdAt: string };
 
 /**
  * PRs abertas por mim (`@me`) criadas dentro de cada janela de tempo e que ainda estão abertas
  * agora — não é "todas as PRs abertas agora" (isso não combina com período: uma PR pode estar
- * aberta há meses). `ano` usa uma janela literal de 365 dias, já que aqui não tem o mesmo "from
- * omitido = ano corrido" que o GraphQL do `contributionsCollection` oferece.
+ * aberta há meses).
+ *
+ * A API de busca do GitHub tem um limite bem mais apertado que o resto da API (30 requisições
+ * por minuto) — por isso, em vez de 4 chamadas (uma por janela), busca só a janela mais larga
+ * (`ano`, 365 dias — sem o mesmo "from omitido = ano corrido" que o GraphQL do
+ * `contributionsCollection` oferece) com a data de criação de cada PR, e conta hoje/semana/mês
+ * no lado do cliente. 1 chamada em vez de 4.
  */
 async function fetchPrsOpenPeriodTotals(owner?: string): Promise<PeriodTotals> {
-  const [hoje, semana, mes, ano] = await Promise.all([
-    fetchPrsOpenCount(isoStartOfTodayUtc(), owner),
-    fetchPrsOpenCount(isoDaysAgo(7), owner),
-    fetchPrsOpenCount(isoDaysAgo(30), owner),
-    fetchPrsOpenCount(isoDaysAgo(365), owner),
-  ]);
-  return { hoje, semana, mes, ano };
+  const args = ["search", "prs", "--author=@me", "--state=open", `--created=>=${isoDaysAgo(365)}`, "--limit=1000", "--json", "createdAt"];
+  if (owner) args.push(`--owner=${owner}`);
+  const items = await runGhJson<CreatedAtItem[]>(args);
+
+  const todayMs = startOfTodayUtcMs();
+  const weekMs = daysAgoMs(7);
+  const monthMs = daysAgoMs(30);
+  let hoje = 0;
+  let semana = 0;
+  let mes = 0;
+  for (const item of items) {
+    const createdMs = new Date(item.createdAt).getTime();
+    if (createdMs >= todayMs) hoje++;
+    if (createdMs >= weekMs) semana++;
+    if (createdMs >= monthMs) mes++;
+  }
+  return { hoje, semana, mes, ano: items.length };
 }
 
 /** PRs abertas por mim, por período, em toda a conta pessoal (usado pelo poller central). */

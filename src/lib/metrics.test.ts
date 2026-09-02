@@ -50,23 +50,34 @@ describe("métricas pessoais escopadas por organização (buscas)", () => {
 });
 
 describe("fetchPrsOpenByPeriod / fetchOrgPrsOpenByPeriod", () => {
-  it("busca as 4 janelas com --author=@me, --state=open e --created, sem --owner", async () => {
+  /**
+   * A API de busca do GitHub tem um limite bem mais apertado (30 req/min) que o resto — por
+   * isso isto busca só a janela mais larga (1 chamada) e conta hoje/semana/mês no lado do
+   * cliente a partir do `createdAt` de cada item, em vez de 1 chamada por janela.
+   */
+  function itemsAt(...daysAgo: number[]) {
+    const now = Date.now();
+    return daysAgo.map((d) => ({ createdAt: new Date(now - d * 24 * 3600 * 1000).toISOString() }));
+  }
+
+  it("faz UMA chamada só (não 4) e conta hoje/semana/mês/ano no cliente pelo createdAt", async () => {
+    runGhJson.mockResolvedValueOnce(itemsAt(0, 3, 15, 100));
+
     const totals = await fetchPrsOpenByPeriod();
-    expect(totals).toEqual({ hoje: 3, semana: 3, mes: 3, ano: 3 });
-    for (const call of runGh.mock.calls) {
-      const args = call[0] as string[];
-      expect(args).toEqual(expect.arrayContaining(["search", "prs", "--author=@me", "--state=open"]));
-      expect(args.some((a) => a.startsWith("--created=>="))).toBe(true);
-      expect(args.some((a) => a.startsWith("--owner="))).toBe(false);
-    }
+
+    expect(totals).toEqual({ hoje: 1, semana: 2, mes: 3, ano: 4 });
+    expect(runGhJson).toHaveBeenCalledTimes(1);
+    const args = runGhJson.mock.calls[0]?.[0] as string[];
+    expect(args).toEqual(expect.arrayContaining(["search", "prs", "--author=@me", "--state=open", "--limit=1000", "--json", "createdAt"]));
+    expect(args.some((a) => a.startsWith("--created=>="))).toBe(true);
+    expect(args.some((a) => a.startsWith("--owner="))).toBe(false);
   });
 
-  it("versão escopada por organização soma --owner em todas as 4 chamadas", async () => {
-    const totals = await fetchOrgPrsOpenByPeriod("minha-org");
-    expect(totals).toEqual({ hoje: 3, semana: 3, mes: 3, ano: 3 });
-    for (const call of runGh.mock.calls) {
-      expect(call[0] as string[]).toEqual(expect.arrayContaining(["--owner=minha-org"]));
-    }
+  it("versão escopada por organização soma --owner na única chamada", async () => {
+    runGhJson.mockResolvedValueOnce(itemsAt(0));
+    await fetchOrgPrsOpenByPeriod("minha-org");
+    expect(runGhJson).toHaveBeenCalledTimes(1);
+    expect(runGhJson.mock.calls[0]?.[0] as string[]).toEqual(expect.arrayContaining(["--owner=minha-org"]));
   });
 });
 
