@@ -13,6 +13,18 @@ describe("refreshIntervalMs", () => {
   it("aplica o piso mínimo mesmo se o usuário configurar um valor menor", () => {
     expect(refreshIntervalMs({ refreshIntervalSeconds: 5 })).toBe(MIN_REFRESH_INTERVAL_SECONDS * 1000);
   });
+
+  it("cai no default quando o valor salvo é NaN (nunca deixa passar pro setInterval)", () => {
+    expect(refreshIntervalMs({ refreshIntervalSeconds: NaN })).toBe(DEFAULT_REFRESH_INTERVAL_SECONDS * 1000);
+  });
+
+  it("cai no default quando o valor salvo é Infinity", () => {
+    expect(refreshIntervalMs({ refreshIntervalSeconds: Infinity })).toBe(DEFAULT_REFRESH_INTERVAL_SECONDS * 1000);
+  });
+
+  it("cai no default quando o valor salvo não é um número", () => {
+    expect(refreshIntervalMs({ refreshIntervalSeconds: "60" as unknown as number })).toBe(DEFAULT_REFRESH_INTERVAL_SECONDS * 1000);
+  });
 });
 
 describe("resolvePeriod", () => {

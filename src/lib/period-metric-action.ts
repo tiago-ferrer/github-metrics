@@ -26,6 +26,8 @@ export abstract class PeriodMetricAction extends SingletonAction<PeriodActionSet
   #activeOrg = new Map<string, string | undefined>();
   #latest: { snapshot: MetricsSnapshot | null; error: GhError | null } = { snapshot: null, error: null };
   #lastGoodOrgTotals = new Map<string, PeriodTotals>();
+  #activationChain = new Map<string, Promise<void>>();
+  #tickInFlight = new Set<string>();
 
   protected abstract label(): string;
   protected abstract totals(snapshot: MetricsSnapshot): PeriodTotals;
@@ -45,6 +47,8 @@ export abstract class PeriodMetricAction extends SingletonAction<PeriodActionSet
 
   override onWillDisappear(ev: WillDisappearEvent<PeriodActionSettings>): void {
     this.#deactivate(ev.action.id);
+    this.#activationChain.delete(ev.action.id);
+    this.#tickInFlight.delete(ev.action.id);
   }
 
   override onDidReceiveSettings(ev: DidReceiveSettingsEvent<PeriodActionSettings>): void {
@@ -59,7 +63,22 @@ export abstract class PeriodMetricAction extends SingletonAction<PeriodActionSet
     await ev.action.showOk();
   }
 
+  /**
+   * Serializado por tecla pelo mesmo motivo do SimpleMetricAction: sem isso, uma rajada de
+   * onWillAppear/onDidReceiveSettings concorrentes podia empilhar vários `setInterval` (cada um
+   * já disparando uma busca imediata) pra mesma tecla, sem nenhum cancelar o anterior.
+   */
   async #activate(action: KeyAction<PeriodActionSettings>): Promise<void> {
+    const previous = this.#activationChain.get(action.id) ?? Promise.resolve();
+    const current = previous.then(() => this.#activateSerial(action));
+    this.#activationChain.set(
+      action.id,
+      current.catch(() => {}),
+    );
+    await current;
+  }
+
+  async #activateSerial(action: KeyAction<PeriodActionSettings>): Promise<void> {
     const settings = await action.getSettings();
     const org = settings.org?.trim() || undefined;
     const alreadyRunning = this.#unsubscribers.has(action.id) || this.#timers.has(action.id);
@@ -127,6 +146,18 @@ export abstract class PeriodMetricAction extends SingletonAction<PeriodActionSet
   }
 
   async #tickOrgScoped(action: KeyAction<PeriodActionSettings>, org: string): Promise<void> {
+    // Trava por tecla: evita duas buscas concorrentes (timer + reativação quase simultâneos)
+    // somando chamadas de `gh`/GraphQL em paralelo pra mesma tecla.
+    if (this.#tickInFlight.has(action.id)) return;
+    this.#tickInFlight.add(action.id);
+    try {
+      await this.#tickOrgScopedUnguarded(action, org);
+    } finally {
+      this.#tickInFlight.delete(action.id);
+    }
+  }
+
+  async #tickOrgScopedUnguarded(action: KeyAction<PeriodActionSettings>, org: string): Promise<void> {
     const settings = await action.getSettings();
     const period = resolvePeriod(settings);
     try {

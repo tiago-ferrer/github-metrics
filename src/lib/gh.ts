@@ -42,6 +42,27 @@ async function resolveGhBinary(): Promise<string> {
   return normalizeGhBinaryPath(custom);
 }
 
+/**
+ * Diretórios comuns de instalação do `gh` no macOS via Homebrew (Apple Silicon e Intel). O app
+ * Stream Deck lança o plugin como processo GUI (via Launch Services), que **não herda o PATH do
+ * shell do usuário** (`~/.zprofile`/`~/.zshrc` só rodam em sessões de shell interativas) — por
+ * isso `gh` instalado via Homebrew não é encontrado mesmo estando instalado e autenticado no
+ * terminal, e a action mostra "gh não instalado" incorretamente. Complementa (não substitui)
+ * `ghBinaryPath`: aqui só ajuda a resolver `gh` pelo nome "solto" via PATH.
+ */
+const COMMON_GH_DIRS = ["/opt/homebrew/bin", "/usr/local/bin"];
+
+export function buildEnv(
+  baseEnv: NodeJS.ProcessEnv = process.env,
+  platform: NodeJS.Platform = process.platform,
+): NodeJS.ProcessEnv {
+  if (platform !== "darwin") return { ...baseEnv, NO_COLOR: "1" };
+  const existingDirs = (baseEnv.PATH ?? "").split(":").filter(Boolean);
+  const missingDirs = COMMON_GH_DIRS.filter((dir) => !existingDirs.includes(dir));
+  const path = [...existingDirs, ...missingDirs].join(":");
+  return { ...baseEnv, PATH: path, NO_COLOR: "1" };
+}
+
 function classifyError(err: unknown): GhError {
   const nodeErr = err as { code?: string; killed?: boolean; stderr?: string; message?: string };
 
@@ -75,7 +96,7 @@ export async function runGh(args: string[], options: { timeoutMs?: number } = {}
     const { stdout } = await execFileAsync(bin, args, {
       timeout: options.timeoutMs ?? 15_000,
       maxBuffer: 10 * 1024 * 1024,
-      env: { ...process.env, NO_COLOR: "1" },
+      env: buildEnv(process.env),
     });
     return stdout.trim();
   } catch (err) {

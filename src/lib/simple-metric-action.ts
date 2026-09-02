@@ -29,6 +29,8 @@ export abstract class SimpleMetricAction<TSettings extends OrgFilterSettings = O
   #activeOrg = new Map<string, string | undefined>();
   #lastGoodOrgValue = new Map<string, number>();
   #latestSnapshot: MetricsSnapshot | null = null;
+  #activationChain = new Map<string, Promise<void>>();
+  #tickInFlight = new Set<string>();
 
   /** Rótulo curto exibido acima do número (ex.: "PRs"). */
   protected abstract label(): string;
@@ -58,6 +60,8 @@ export abstract class SimpleMetricAction<TSettings extends OrgFilterSettings = O
 
   override onWillDisappear(ev: WillDisappearEvent<TSettings>): void {
     this.#deactivate(ev.action.id);
+    this.#activationChain.delete(ev.action.id);
+    this.#tickInFlight.delete(ev.action.id);
   }
 
   override onDidReceiveSettings(ev: DidReceiveSettingsEvent<TSettings>): void {
@@ -72,7 +76,25 @@ export abstract class SimpleMetricAction<TSettings extends OrgFilterSettings = O
     await ev.action.showOk();
   }
 
+  /**
+   * `onWillAppear`/`onDidReceiveSettings` podem disparar em rajada (o app reenvia settings,
+   * troca de perfil, etc.). Sem serializar, duas chamadas de `#activate` concorrentes para a
+   * MESMA tecla podiam passar as duas pela checagem "já está rodando?" antes de qualquer uma
+   * terminar de registrar seu timer — cada uma criava um `setInterval` novo, e cada um desses
+   * já dispara uma busca imediata (`#tickOrgScoped`), então uma rajada de N chamadas virava N
+   * timers vazados e N buscas imediatas empilhadas. Encadear por tecla fecha essa janela.
+   */
   async #activate(action: KeyAction<TSettings>): Promise<void> {
+    const previous = this.#activationChain.get(action.id) ?? Promise.resolve();
+    const current = previous.then(() => this.#activateSerial(action));
+    this.#activationChain.set(
+      action.id,
+      current.catch(() => {}),
+    );
+    await current;
+  }
+
+  async #activateSerial(action: KeyAction<TSettings>): Promise<void> {
     const settings = await action.getSettings();
     const org = settings.org?.trim() || undefined;
     const alreadyRunning = this.#unsubscribers.has(action.id) || this.#timers.has(action.id);
@@ -121,6 +143,19 @@ export abstract class SimpleMetricAction<TSettings extends OrgFilterSettings = O
   }
 
   async #tickOrgScoped(action: KeyAction<TSettings>, org: string): Promise<void> {
+    // Trava por tecla: nunca deixa duas buscas concorrentes se pilharem (timer + reativação
+    // quase simultâneos, por exemplo) — a chamada nova é ignorada em vez de somar mais uma
+    // chamada de `gh` em paralelo pra mesma tecla.
+    if (this.#tickInFlight.has(action.id)) return;
+    this.#tickInFlight.add(action.id);
+    try {
+      await this.#tickOrgScopedUnguarded(action, org);
+    } finally {
+      this.#tickInFlight.delete(action.id);
+    }
+  }
+
+  async #tickOrgScopedUnguarded(action: KeyAction<TSettings>, org: string): Promise<void> {
     try {
       const value = await this.fetchOrgScoped(org);
       this.#lastGoodOrgValue.set(action.id, value);

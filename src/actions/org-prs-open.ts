@@ -25,19 +25,28 @@ type LastGood = { count: number; scopeLabel: string };
 export class OrgPrsOpenAction extends SingletonAction<OrgActionSettings> {
   #timers = new Map<string, ReturnType<typeof setInterval>>();
   #lastGood = new Map<string, LastGood>();
+  #inFlight = new Set<string>();
 
   override onWillAppear(ev: WillAppearEvent<OrgActionSettings>): void {
     if (!ev.action.isKey()) return;
     const action = ev.action;
+    // Idempotente: se onWillAppear disparar mais de uma vez pra mesma tecla (o app pode fazer
+    // isso ao trocar de perfil/página), limpa o timer anterior antes de criar outro — sem isso,
+    // cada disparo extra vazava um setInterval órfão que nunca era cancelado.
+    this.#clearTimer(action.id);
     void this.#tick(action);
     void this.#startTimer(action);
   }
 
   override onWillDisappear(ev: WillDisappearEvent<OrgActionSettings>): void {
-    const timer = this.#timers.get(ev.action.id);
-    if (timer) clearInterval(timer);
-    this.#timers.delete(ev.action.id);
+    this.#clearTimer(ev.action.id);
     this.#lastGood.delete(ev.action.id);
+  }
+
+  #clearTimer(actionId: string): void {
+    const timer = this.#timers.get(actionId);
+    if (timer) clearInterval(timer);
+    this.#timers.delete(actionId);
   }
 
   override onDidReceiveSettings(ev: DidReceiveSettingsEvent<OrgActionSettings>): void {
@@ -66,6 +75,19 @@ export class OrgPrsOpenAction extends SingletonAction<OrgActionSettings> {
   }
 
   async #tick(action: KeyAction<OrgActionSettings>): Promise<void> {
+    // Trava por tecla: se o timer, onDidReceiveSettings e a chamada inicial em onWillAppear
+    // colidirem (ou qualquer evento disparar de novo antes da busca anterior terminar), ignora
+    // a chamada nova em vez de empilhar execFile concorrentes pra mesma tecla.
+    if (this.#inFlight.has(action.id)) return;
+    this.#inFlight.add(action.id);
+    try {
+      await this.#tickUnguarded(action);
+    } finally {
+      this.#inFlight.delete(action.id);
+    }
+  }
+
+  async #tickUnguarded(action: KeyAction<OrgActionSettings>): Promise<void> {
     const settings = await action.getSettings();
     const org = settings.org?.trim();
     if (!org) {

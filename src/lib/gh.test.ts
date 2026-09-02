@@ -16,7 +16,7 @@ vi.mock("@elgato/streamdeck", () => ({
   },
 }));
 
-const { runGh, GhError, normalizeGhBinaryPath } = await import("./gh.js");
+const { runGh, GhError, normalizeGhBinaryPath, buildEnv } = await import("./gh.js");
 
 beforeEach(() => {
   mockGlobalSettings = {};
@@ -94,5 +94,34 @@ describe("normalizeGhBinaryPath — compatibilidade Windows", () => {
   it("não altera nada fora do Windows", () => {
     expect(normalizeGhBinaryPath("/usr/local/bin/gh", "darwin")).toBe("/usr/local/bin/gh");
     expect(normalizeGhBinaryPath("/usr/local/bin/gh", "linux")).toBe("/usr/local/bin/gh");
+  });
+});
+
+/**
+ * O app Stream Deck lança o plugin como processo GUI (Launch Services), que não herda o PATH
+ * do shell do usuário — por isso `gh` instalado via Homebrew (comum em Apple Silicon) não é
+ * encontrado mesmo estando instalado e autenticado no terminal ("gh não instalado" incorreto).
+ * `buildEnv` complementa o PATH com os diretórios comuns do Homebrew no macOS.
+ */
+describe("buildEnv — PATH do Homebrew no macOS", () => {
+  it("acrescenta os diretórios do Homebrew no macOS quando ausentes do PATH", () => {
+    const env = buildEnv({ PATH: "/usr/bin:/bin" }, "darwin");
+    expect(env.PATH).toBe("/usr/bin:/bin:/opt/homebrew/bin:/usr/local/bin");
+  });
+
+  it("não duplica diretórios já presentes no PATH", () => {
+    const env = buildEnv({ PATH: "/opt/homebrew/bin:/usr/bin" }, "darwin");
+    expect(env.PATH).toBe("/opt/homebrew/bin:/usr/bin:/usr/local/bin");
+  });
+
+  it("não mexe no PATH fora do macOS", () => {
+    const env = buildEnv({ PATH: "/usr/bin:/bin" }, "win32");
+    expect(env.PATH).toBe("/usr/bin:/bin");
+  });
+
+  it("preserva as demais variáveis de ambiente e sempre define NO_COLOR", () => {
+    const env = buildEnv({ PATH: "/usr/bin", HOME: "/Users/tferrer" }, "darwin");
+    expect(env.HOME).toBe("/Users/tferrer");
+    expect(env.NO_COLOR).toBe("1");
   });
 });

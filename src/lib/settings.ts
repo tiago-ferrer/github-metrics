@@ -11,9 +11,17 @@ export type GlobalSettings = {
 export const DEFAULT_REFRESH_INTERVAL_SECONDS = 60;
 export const MIN_REFRESH_INTERVAL_SECONDS = 30;
 
+/**
+ * `Math.max(30, valor)` só protege o piso quando `valor` é um número de verdade — com NaN,
+ * `Math.max` sempre retorna NaN (independente do outro operando), e `setInterval(fn, NaN)` no
+ * Node.js vira ~1ms (delay inválido colapsa pro mínimo) em vez de falhar, o que transformaria
+ * qualquer valor inválido salvo nas settings num loop disparando centenas de vezes por segundo.
+ * Por isso valida explicitamente que é um número finito antes de aplicar o piso.
+ */
 export function refreshIntervalMs(settings: GlobalSettings): number {
-  const seconds = Math.max(MIN_REFRESH_INTERVAL_SECONDS, settings.refreshIntervalSeconds ?? DEFAULT_REFRESH_INTERVAL_SECONDS);
-  return seconds * 1000;
+  const raw = settings.refreshIntervalSeconds;
+  const seconds = typeof raw === "number" && Number.isFinite(raw) ? raw : DEFAULT_REFRESH_INTERVAL_SECONDS;
+  return Math.max(MIN_REFRESH_INTERVAL_SECONDS, seconds) * 1000;
 }
 
 /** Períodos suportados pelas actions "Commits" e "Reviews Feitas". */
