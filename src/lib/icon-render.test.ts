@@ -39,6 +39,18 @@ describe("renderMetricIcon", () => {
     expect(svg).not.toContain(">null<");
   });
 
+  it("trunca a legenda longa demais (ex.: apelido de repositório digitado pelo usuário)", () => {
+    const svg = renderMetricIcon({
+      glyphId: "prs-project",
+      accent: "blue",
+      label: "PRs",
+      value: 4,
+      scopeLabel: "uma-organizacao-bem-grande/um-repositorio-enorme",
+    });
+    expect(svg).toContain("uma-organizacao-bem-g…");
+    expect(svg).not.toContain("uma-organizacao-bem-grande/um-repositorio-enorme");
+  });
+
   it("desenha o anel de destaque (chrome) quando strength > 0, e omite quando ausente", () => {
     const withChrome = renderMetricIcon({ glyphId: "prs-open", accent: "blue", label: "PRs", value: 1 }, { color: "#FF0000", strength: 0.8 });
     const withoutChrome = renderMetricIcon({ glyphId: "prs-open", accent: "blue", label: "PRs", value: 1 });

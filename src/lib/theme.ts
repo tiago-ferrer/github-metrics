@@ -48,6 +48,16 @@ export function escapeXml(value: string): string {
 }
 
 /**
+ * Corta com reticências além de `maxLength` — a legenda pequena do ícone (ex.: "owner/repo",
+ * ou um apelido digitado pelo usuário) não tem quebra de linha nem largura calculada, então um
+ * texto comprido demais estoura a borda do cartão (mesmo problema já corrigido no rótulo do
+ * Status; aqui a entrada pode ser texto livre do usuário, então trunca defensivamente).
+ */
+export function truncate(text: string, maxLength: number): string {
+  return text.length > maxLength ? `${text.slice(0, maxLength - 1)}…` : text;
+}
+
+/**
  * Formata contagens grandes de forma compacta (1234 → "1.2k", 12345 → "12k", 1234567 → "1.2M")
  * pra caber no número grande do ícone sem precisar espremer a fonte — estrelas de repositórios
  * populares facilmente passam de milhares.

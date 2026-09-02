@@ -85,6 +85,11 @@ export class PrsProjectAction extends SingletonAction<PrsProjectSettings> {
     return cached ? `https://github.com/${cached.owner}/${cached.repo}/pulls` : "https://github.com";
   }
 
+  /** Apelido configurado pelo usuário, se houver — senão o `owner/repo` automático. */
+  #scopeLabel(displayName: string | undefined, owner: string, repo: string): string {
+    return displayName || `${owner}/${repo}`;
+  }
+
   /** Pulsa (valor mudou), respira (desatualizado/erro) ou para o ícone, conforme o estado. */
   #applyIcon(actionId: string, action: KeyAction<PrsProjectSettings>, model: MetricIconModel, state: "ok" | "stale" | "error"): void {
     const previous = this.#lastModel.get(actionId);
@@ -128,10 +133,17 @@ export class PrsProjectAction extends SingletonAction<PrsProjectSettings> {
       return;
     }
     const org = settings.org?.trim();
+    const displayName = settings.displayName?.trim();
     try {
       const { count, owner } = await fetchRepoOpenPrCount(repo, org);
       this.#lastGood.set(action.id, { count, owner, repo });
-      const model: MetricIconModel = { glyphId: "prs-project", accent: "blue", label: "PRs", value: count, scopeLabel: `${owner}/${repo}` };
+      const model: MetricIconModel = {
+        glyphId: "prs-project",
+        accent: "blue",
+        label: "PRs",
+        value: count,
+        scopeLabel: this.#scopeLabel(displayName, owner, repo),
+      };
       this.#applyIcon(action.id, action, model, "ok");
     } catch (err) {
       const cached = this.#lastGood.get(action.id);
@@ -141,11 +153,18 @@ export class PrsProjectAction extends SingletonAction<PrsProjectSettings> {
           accent: "blue",
           label: "PRs",
           value: cached.count,
-          scopeLabel: `${cached.owner}/${cached.repo} · desatualizado`,
+          scopeLabel: `${this.#scopeLabel(displayName, cached.owner, cached.repo)} · desatualizado`,
         };
         this.#applyIcon(action.id, action, model, "stale");
       } else {
-        const model: MetricIconModel = { glyphId: "prs-project", accent: "blue", label: "PRs", value: null, statusText: errorLabel(err) };
+        const model: MetricIconModel = {
+          glyphId: "prs-project",
+          accent: "blue",
+          label: "PRs",
+          value: null,
+          statusText: errorLabel(err),
+          scopeLabel: displayName || (org ? `${org}/${repo}` : repo),
+        };
         this.#applyIcon(action.id, action, model, "error");
       }
       streamDeck.logger.warn(

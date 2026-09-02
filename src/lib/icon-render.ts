@@ -1,5 +1,8 @@
 import { glyph, type GlyphId } from "./glyphs.js";
-import { ACCENTS, type AccentKey, escapeXml, formatCount, FONT_STACK, THEME } from "./theme.js";
+import { ACCENTS, type AccentKey, escapeXml, formatCount, FONT_STACK, THEME, truncate } from "./theme.js";
+
+/** Comprimento máximo da legenda pequena antes de truncar com "…" (cabe em 144px a 10.5–12.5px). */
+const SCOPE_LABEL_MAX_LENGTH = 22;
 
 /** Cor + intensidade (0–1) do anel de destaque ao redor do cartão — ver `icon-animator.ts`. */
 export type Chrome = { color: string; strength: number };
@@ -89,7 +92,7 @@ export function renderMetricIcon(model: MetricIconModel, chrome?: Chrome): strin
         })();
   const label = `<text x="72" y="120" fill="${THEME.textSecondary}" font-family="${FONT_STACK}" font-size="13" font-weight="600" text-anchor="middle">${escapeXml(model.label)}</text>`;
   const scope = model.scopeLabel
-    ? `<text x="72" y="133" fill="${THEME.muted}" font-family="${FONT_STACK}" font-size="10.5" text-anchor="middle">${escapeXml(model.scopeLabel)}</text>`
+    ? `<text x="72" y="133" fill="${THEME.muted}" font-family="${FONT_STACK}" font-size="10.5" text-anchor="middle">${escapeXml(truncate(model.scopeLabel, SCOPE_LABEL_MAX_LENGTH))}</text>`
     : "";
   return shell(`${chip}\n  ${numberOrStatus}\n  ${label}\n  ${scope}`, chrome);
 }

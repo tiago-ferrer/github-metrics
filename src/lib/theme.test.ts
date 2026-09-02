@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { escapeXml, formatCount } from "./theme.js";
+import { escapeXml, formatCount, truncate } from "./theme.js";
 
 describe("formatCount", () => {
   it("mostra números pequenos como estão", () => {
@@ -28,5 +28,19 @@ describe("escapeXml", () => {
 
   it("não mexe em texto normal", () => {
     expect(escapeXml("fiap-2tdsps-2026")).toBe("fiap-2tdsps-2026");
+  });
+});
+
+describe("truncate", () => {
+  it("não mexe em texto dentro do limite", () => {
+    expect(truncate("cli", 22)).toBe("cli");
+  });
+
+  it("corta com reticências além do limite", () => {
+    expect(truncate("uma-organizacao-bem-grande/um-repositorio-enorme", 22)).toBe("uma-organizacao-bem-g…");
+  });
+
+  it("o resultado nunca passa do limite (contando a reticência)", () => {
+    expect(truncate("x".repeat(50), 10).length).toBe(10);
   });
 });

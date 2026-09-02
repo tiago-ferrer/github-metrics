@@ -55,8 +55,11 @@ export function resolvePeriod(settings: PeriodActionSettings): Period {
  * Settings da action "PRs Project". `repo` é obrigatório (nome do repositório); `org` é
  * opcional — se vazia, assume que o repositório é do próprio usuário. Mostra PRs de qualquer
  * autor (visão do repositório/equipe, não da conta pessoal — diferente das outras actions).
+ * `displayName` é opcional — um apelido curto do repositório, pra mostrar no ícone no lugar de
+ * `owner/repo` (que pode ficar longo demais pro espaço da tecla); vazio mantém o automático.
  */
 export type PrsProjectSettings = {
   org?: string;
   repo?: string;
+  displayName?: string;
 };
