@@ -12,7 +12,7 @@ vi.mock("@elgato/streamdeck", () => ({
 const runGh = vi.fn(async (..._args: unknown[]) => "0");
 vi.mock("./gh.js", () => ({ runGh, runGhJson: vi.fn() }));
 
-const { fetchRepoOpenPrCount } = await import("./repo-prs.js");
+const { fetchRepoOpenPrCount, resolveOwner } = await import("./repo-prs.js");
 
 beforeEach(() => {
   mockGlobalSettings = {};
@@ -46,5 +46,23 @@ describe("fetchRepoOpenPrCount", () => {
     runGh.mockResolvedValueOnce("1");
     await fetchRepoOpenPrCount("  cli  ", "  minha-org  ");
     expect(runGh).toHaveBeenCalledWith(expect.arrayContaining(["--repo=minha-org/cli"]));
+  });
+});
+
+describe("resolveOwner", () => {
+  // Exportado à parte (não só usado dentro de fetchRepoOpenPrCount) pra montar a URL de
+  // "PRs Project" direto das settings, sem depender de já ter uma contagem de PRs em cache.
+  it("usa a organização informada, sem chamar o gh", async () => {
+    await expect(resolveOwner("minha-org")).resolves.toBe("minha-org");
+    expect(runGh).not.toHaveBeenCalled();
+  });
+
+  it("sem organização, resolve via gh (githubUsername ou gh api user)", async () => {
+    mockGlobalSettings = { githubUsername: "ferrertiago" };
+    await expect(resolveOwner()).resolves.toBe("ferrertiago");
+  });
+
+  it("remove espaços extras da organização", async () => {
+    await expect(resolveOwner("  minha-org  ")).resolves.toBe("minha-org");
   });
 });

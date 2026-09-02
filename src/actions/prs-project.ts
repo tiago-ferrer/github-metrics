@@ -12,7 +12,7 @@ import { errorLabel } from "../lib/errors.js";
 import { GhError } from "../lib/gh.js";
 import { iconAnimator, safeSetImage } from "../lib/icon-animator.js";
 import { renderMetricIcon, type MetricIconModel } from "../lib/icon-render.js";
-import { fetchRepoOpenPrCount } from "../lib/repo-prs.js";
+import { fetchRepoOpenPrCount, resolveOwner } from "../lib/repo-prs.js";
 import { refreshIntervalMs, type GlobalSettings, type PrsProjectSettings } from "../lib/settings.js";
 import { ACCENTS } from "../lib/theme.js";
 
@@ -67,7 +67,8 @@ export class PrsProjectAction extends SingletonAction<PrsProjectSettings> {
 
   override async onKeyDown(ev: KeyDownEvent<PrsProjectSettings>): Promise<void> {
     if (!ev.action.isKey()) return;
-    await streamDeck.system.openUrl(this.#url(ev.action.id));
+    const settings = await ev.action.getSettings();
+    await streamDeck.system.openUrl(await this.#url(settings));
     const model = this.#lastModel.get(ev.action.id);
     // Clicar confirma qualquer aumento pendente ("comemoração") — para de piscar em verde.
     this.#celebration.acknowledge(ev.action.id, model?.value ?? undefined);
@@ -84,10 +85,16 @@ export class PrsProjectAction extends SingletonAction<PrsProjectSettings> {
     this.#timers.set(action.id, timer);
   }
 
-  /** Usa o dono/repo da última busca bem-sucedida — evita resolver de novo só pra montar a URL. */
-  #url(actionId: string): string {
-    const cached = this.#lastGood.get(actionId);
-    return cached ? `https://github.com/${cached.owner}/${cached.repo}/pulls` : "https://github.com";
+  /**
+   * Monta a URL a partir das settings atuais da tecla — não depende de já ter uma contagem
+   * bem-sucedida em cache (`#lastGood`), que ficava vazio se a primeira busca falhasse e fazia
+   * o clique cair na home genérica do GitHub em vez da página de pulls do repositório.
+   */
+  async #url(settings: PrsProjectSettings): Promise<string> {
+    const repo = settings.repo?.trim();
+    if (!repo) return "https://github.com";
+    const owner = await resolveOwner(settings.org);
+    return `https://github.com/${owner}/${repo}/pulls`;
   }
 
   /** Apelido configurado pelo usuário, se houver — senão o `owner/repo` automático. */

@@ -3,7 +3,7 @@ import { countSearch, resolveUsername } from "./metrics.js";
 import type { GlobalSettings } from "./settings.js";
 
 /** Resolve o "dono" do repositório: a organização informada, ou (se vazia) a própria conta do usuário. */
-async function resolveOwner(org?: string): Promise<string> {
+export async function resolveOwner(org?: string): Promise<string> {
   const trimmedOrg = org?.trim();
   if (trimmedOrg) return trimmedOrg;
   const settings = await streamDeck.settings.getGlobalSettings<GlobalSettings>();
