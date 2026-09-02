@@ -32,6 +32,9 @@ export const ACCENTS = Object.freeze({
   green: "#4ADE80",
   gold: "#F2C14E",
   red: "#FF6B6B",
+  indigo: "#818CF8",
+  pink: "#F472B6",
+  orange: "#FB923C",
 });
 
 export type AccentKey = keyof typeof ACCENTS;

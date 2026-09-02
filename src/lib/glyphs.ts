@@ -13,6 +13,9 @@ export type GlyphId =
   | "reviews-done"
   | "stars-received"
   | "prs-project"
+  | "pushes"
+  | "pr-comments"
+  | "inline-comments"
   | "status-ok"
   | "status-error";
 
@@ -50,6 +53,19 @@ const GLYPHS: Record<GlyphId, (color: string) => string> = {
     <rect x="5.7" y="9.2" width="1.8" height="1.8" fill="${c}" stroke="none"/>
     <rect x="9" y="9.2" width="1.8" height="1.8" fill="${c}" stroke="none"/>
     <rect x="7.3" y="13" width="3.2" height="4" fill="${c}" stroke="none"/>`,
+  pushes: (c) => `
+    <path d="M10 15.5 V4.5" stroke="${c}"/>
+    <path d="M4.5 9 L10 3.5 L15.5 9" stroke="${c}"/>
+    <path d="M3.5 17 H16.5" stroke="${c}"/>`,
+  "pr-comments": (c) => `
+    <path d="M3 4.5 H17 V13.5 H9 L5 17 V13.5 H3 Z" stroke="${c}"/>
+    <circle cx="7" cy="9" r="0.85" fill="${c}" stroke="none"/>
+    <circle cx="10" cy="9" r="0.85" fill="${c}" stroke="none"/>
+    <circle cx="13" cy="9" r="0.85" fill="${c}" stroke="none"/>`,
+  "inline-comments": (c) => `
+    <path d="M3 4.5 H17 V13.5 H9 L5 17 V13.5 H3 Z" stroke="${c}"/>
+    <path d="M6.3 7.6 H13.7" stroke="${c}" stroke-width="1.3"/>
+    <path d="M6.3 10.4 H11" stroke="${c}" stroke-width="1.3"/>`,
   "status-ok": (c) => `
     <circle cx="10" cy="10" r="7.5" stroke="${c}"/>
     <path d="M6.5 10.2 L9 12.7 L13.7 7.5" stroke="${c}"/>`,

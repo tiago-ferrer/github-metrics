@@ -14,6 +14,9 @@ export type MetricsSnapshot = {
   starsReceived: number;
   commits: PeriodTotals;
   reviewsDone: PeriodTotals;
+  pushes: PeriodTotals;
+  prComments: PeriodTotals;
+  inlineComments: PeriodTotals;
 };
 
 export async function resolveUsername(settings: GlobalSettings): Promise<string> {
@@ -126,6 +129,83 @@ export async function fetchOrgPrsOpenByPeriod(org: string): Promise<PeriodTotals
   return fetchPrsOpenPeriodTotals(org.trim());
 }
 
+type GitHubEvent = {
+  type: string;
+  created_at: string;
+  repo?: { name?: string };
+  payload?: { issue?: { pull_request?: unknown } };
+};
+
+const isPushEvent = (e: GitHubEvent): boolean => e.type === "PushEvent";
+/** GitHub trata comentário de PR como "comentário de issue" — só dá pra saber que é PR pela presença de `payload.issue.pull_request`. */
+const isPrCommentEvent = (e: GitHubEvent): boolean => e.type === "IssueCommentEvent" && Boolean(e.payload?.issue?.pull_request);
+/** Comentário em linha específica do diff (parte de uma review), diferente do comentário geral na conversa da PR. */
+const isInlineCommentEvent = (e: GitHubEvent): boolean => e.type === "PullRequestReviewCommentEvent";
+
+/**
+ * `contributionsCollection` (GraphQL) não expõe push nem comentário como tipo de contribuição —
+ * só a Events API (`/users/{username}/events`) tem esses dados, via os tipos de evento brutos do
+ * GitHub. Duas limitações reais da própria API, sem contorno possível:
+ *
+ * 1. Só cobre os **últimos ~90 dias** de histórico (e no máximo ~300 eventos) — diferente das
+ *    outras métricas, aqui "ano" não é um ano de verdade, é só o que a API devolver.
+ * 2. Pra outra conta que não a autenticada no `gh` (via `githubUsername`), só mostra eventos
+ *    **públicos** — eventos de repositório privado só aparecem se for a própria conta logada.
+ *
+ * Busca só uma vez (evita pedir 3x a mesma lista pra cada métrica) e conta os 3 tipos de evento
+ * a partir do mesmo resultado.
+ */
+async function fetchRecentEvents(username: string): Promise<GitHubEvent[]> {
+  return runGhJson<GitHubEvent[]>(["api", `users/${username}/events`, "--paginate"]);
+}
+
+function bucketEventsByPeriod(events: GitHubEvent[], matches: (e: GitHubEvent) => boolean, org?: string): PeriodTotals {
+  const todayMs = startOfTodayUtcMs();
+  const weekMs = daysAgoMs(7);
+  const monthMs = daysAgoMs(30);
+  let hoje = 0;
+  let semana = 0;
+  let mes = 0;
+  let ano = 0;
+  for (const event of events) {
+    if (!matches(event)) continue;
+    if (org && !event.repo?.name?.startsWith(`${org}/`)) continue;
+    const createdMs = new Date(event.created_at).getTime();
+    ano++;
+    if (createdMs >= monthMs) mes++;
+    if (createdMs >= weekMs) semana++;
+    if (createdMs >= todayMs) hoje++;
+  }
+  return { hoje, semana, mes, ano };
+}
+
+export type ActivityTotals = {
+  pushes: PeriodTotals;
+  prComments: PeriodTotals;
+  inlineComments: PeriodTotals;
+};
+
+async function fetchActivityTotals(username: string, org?: string): Promise<ActivityTotals> {
+  const events = await fetchRecentEvents(username);
+  return {
+    pushes: bucketEventsByPeriod(events, isPushEvent, org),
+    prComments: bucketEventsByPeriod(events, isPrCommentEvent, org),
+    inlineComments: bucketEventsByPeriod(events, isInlineCommentEvent, org),
+  };
+}
+
+/** Pushes/comentários por período, em toda a conta pessoal (usado pelo poller central). */
+export async function fetchActivityTotalsForUser(username: string): Promise<ActivityTotals> {
+  return fetchActivityTotals(username);
+}
+
+/** Pushes/comentários por período, restritos aos repositórios de uma organização específica. */
+export async function fetchOrgActivityTotals(org: string): Promise<ActivityTotals> {
+  const settings = await streamDeck.settings.getGlobalSettings<GlobalSettings>();
+  const username = await resolveUsername(settings);
+  return fetchActivityTotals(username, org.trim());
+}
+
 async function graphql<T>(query: string, variables: Record<string, string>): Promise<T> {
   const args = ["api", "graphql", "-f", `query=${query}`];
   for (const [key, value] of Object.entries(variables)) {
@@ -232,7 +312,7 @@ export async function fetchSnapshot(): Promise<MetricsSnapshot> {
   const username = await resolveUsername(settings);
   const now = new Date().toISOString();
 
-  const [prsOpen, reviewRequested, issuesAssigned, notifications, combined] = await Promise.all([
+  const [prsOpen, reviewRequested, issuesAssigned, notifications, combined, activity] = await Promise.all([
     fetchPrsOpenByPeriod(),
     countSearch(["search", "prs", "--review-requested=@me", "--state=open"]),
     countSearch(["search", "issues", "--assignee=@me", "--state=open"]),
@@ -244,6 +324,7 @@ export async function fetchSnapshot(): Promise<MetricsSnapshot> {
       monthFrom: isoDaysAgo(30),
       now,
     }),
+    fetchActivityTotalsForUser(username),
   ]);
 
   const u = combined.data.user;
@@ -269,6 +350,9 @@ export async function fetchSnapshot(): Promise<MetricsSnapshot> {
       mes: u.mes.totalPullRequestReviewContributions,
       ano: u.ano.totalPullRequestReviewContributions,
     },
+    pushes: activity.pushes,
+    prComments: activity.prComments,
+    inlineComments: activity.inlineComments,
   };
 }
 

@@ -20,6 +20,8 @@ const {
   fetchOrgPeriodContributions,
   fetchPrsOpenByPeriod,
   fetchOrgPrsOpenByPeriod,
+  fetchActivityTotalsForUser,
+  fetchOrgActivityTotals,
 } = await import("./metrics.js");
 
 beforeEach(() => {
@@ -94,6 +96,48 @@ describe("fetchOrgScopedNotifications", () => {
   it("retorna 0 quando nenhuma notificação é da org", async () => {
     runGhJson.mockResolvedValueOnce([[{ repository: { owner: { login: "outra-org" } } }]]);
     await expect(fetchOrgScopedNotifications("minha-org")).resolves.toBe(0);
+  });
+});
+
+describe("fetchActivityTotalsForUser / fetchOrgActivityTotals (pushes/comentários via Events API)", () => {
+  const now = Date.now();
+  const daysAgoIso = (d: number) => new Date(now - d * 24 * 3600 * 1000).toISOString();
+
+  /** Formatos reais confirmados via `gh api users/<login>/events` antes de implementar. */
+  function fakeEvents() {
+    return [
+      { type: "PushEvent", created_at: daysAgoIso(0), repo: { name: "octocat/repo-a" } },
+      { type: "PushEvent", created_at: daysAgoIso(15), repo: { name: "octocat/repo-b" } },
+      // comentário de PR de verdade: IssueCommentEvent com payload.issue.pull_request presente
+      { type: "IssueCommentEvent", created_at: daysAgoIso(3), repo: { name: "octocat/repo-a" }, payload: { issue: { pull_request: { url: "x" } } } },
+      // comentário de issue comum (sem pull_request) — não deve contar como "PR Comments"
+      { type: "IssueCommentEvent", created_at: daysAgoIso(1), repo: { name: "octocat/repo-a" }, payload: { issue: {} } },
+      { type: "PullRequestReviewCommentEvent", created_at: daysAgoIso(2), repo: { name: "octocat/repo-a" } },
+      { type: "PullRequestReviewCommentEvent", created_at: daysAgoIso(60), repo: { name: "outra-org/outro-repo" } },
+      // tipo de evento sem relação nenhuma — deve ser ignorado por completo
+      { type: "WatchEvent", created_at: daysAgoIso(0), repo: { name: "octocat/repo-a" } },
+    ];
+  }
+
+  it("conta pushes, comentários de PR (não de issue comum) e comentários em linha, por período", async () => {
+    runGhJson.mockResolvedValueOnce(fakeEvents());
+
+    const totals = await fetchActivityTotalsForUser("octocat");
+
+    expect(totals.pushes).toEqual({ hoje: 1, semana: 1, mes: 2, ano: 2 });
+    expect(totals.prComments).toEqual({ hoje: 0, semana: 1, mes: 1, ano: 1 }); // só o com pull_request
+    expect(totals.inlineComments).toEqual({ hoje: 0, semana: 1, mes: 1, ano: 2 });
+    expect(runGhJson).toHaveBeenCalledWith(["api", "users/octocat/events", "--paginate"]);
+  });
+
+  it("versão escopada por organização filtra pelo dono do repositório (repo.name começa com 'org/')", async () => {
+    runGhJson.mockResolvedValueOnce(fakeEvents());
+
+    const totals = await fetchOrgActivityTotals("outra-org");
+
+    // só o PullRequestReviewCommentEvent de "outra-org/outro-repo" (60 dias atrás) bate
+    expect(totals.inlineComments).toEqual({ hoje: 0, semana: 0, mes: 0, ano: 1 });
+    expect(totals.pushes).toEqual({ hoje: 0, semana: 0, mes: 0, ano: 0 });
   });
 });
 

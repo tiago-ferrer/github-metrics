@@ -150,6 +150,51 @@
       ]
     },
     {
+      "UUID": "dev.tferrer.githubmetrics.pushes",
+      "Name": "Pushes",
+      "Tooltip": "Pushes feitos no período selecionado (opcionalmente restrito a uma organização) — cobre só os últimos ~90 dias, limitação da API de eventos do GitHub",
+      "Icon": "imgs/actions/pushes/icon",
+      "PropertyInspectorPath": "ui/period-metric-90d.html",
+      "Controllers": [
+        "Keypad"
+      ],
+      "States": [
+        {
+          "Image": "imgs/actions/pushes/icon"
+        }
+      ]
+    },
+    {
+      "UUID": "dev.tferrer.githubmetrics.pr-comments",
+      "Name": "PR Comments",
+      "Tooltip": "Comentários feitos na conversa de Pull Requests no período selecionado (opcionalmente restrito a uma organização) — cobre só os últimos ~90 dias, limitação da API de eventos do GitHub",
+      "Icon": "imgs/actions/pr-comments/icon",
+      "PropertyInspectorPath": "ui/period-metric-90d.html",
+      "Controllers": [
+        "Keypad"
+      ],
+      "States": [
+        {
+          "Image": "imgs/actions/pr-comments/icon"
+        }
+      ]
+    },
+    {
+      "UUID": "dev.tferrer.githubmetrics.inline-comments",
+      "Name": "Inline Comments",
+      "Tooltip": "Comentários em linhas do diff de Pull Requests no período selecionado (opcionalmente restrito a uma organização) — cobre só os últimos ~90 dias, limitação da API de eventos do GitHub",
+      "Icon": "imgs/actions/inline-comments/icon",
+      "PropertyInspectorPath": "ui/period-metric-90d.html",
+      "Controllers": [
+        "Keypad"
+      ],
+      "States": [
+        {
+          "Image": "imgs/actions/inline-comments/icon"
+        }
+      ]
+    },
+    {
       "UUID": "dev.tferrer.githubmetrics.status",
       "Name": "Status da Conta",
       "Tooltip": "Diagnóstico: autenticação do gh e rate limit da API",

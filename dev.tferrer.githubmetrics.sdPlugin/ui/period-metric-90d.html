@@ -1,0 +1,63 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="pi-common.css" />
+  </head>
+  <body>
+    <h1>Esta action</h1>
+    <div class="field">
+      <label for="period">Período</label>
+      <select id="period" data-setting="period">
+        <option value="hoje">Hoje</option>
+        <option value="semana">Última semana</option>
+        <option value="mes">Último mês</option>
+        <option value="ano">Último ano</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="org">Organização</label>
+      <input id="org" type="text" placeholder="opcional — toda a conta" data-setting="org" />
+    </div>
+    <p class="hint">
+      Deixe "Organização" em branco para contar em toda a sua conta GitHub. Preencha com o login
+      de uma organização (ex.: <code>github</code>) para restringir esta tecla só ao que você fez
+      dentro dela.
+    </p>
+    <p class="hint">
+      <strong>Importante:</strong> essa métrica vem da API de eventos do GitHub, que só cobre os
+      <strong>últimos ~90 dias</strong> (e no máximo ~300 eventos). "Último ano" aqui reflete só o
+      que a API tiver disponível, não um ano de verdade — se você não tem atividade recente, pode
+      mostrar 0 mesmo tendo feito isso há mais tempo.
+    </p>
+
+    <h1>Conta GitHub</h1>
+    <div class="field">
+      <label for="githubUsername">Usuário</label>
+      <input id="githubUsername" type="text" placeholder="detectado automaticamente" data-global-setting="githubUsername" />
+    </div>
+    <p class="hint">Pra outra conta que não a autenticada no <code>gh</code>, só aparecem eventos de repositórios públicos.</p>
+
+    <h1>Avançado</h1>
+    <div class="field">
+      <label for="ghBinaryPath">Caminho do gh</label>
+      <input id="ghBinaryPath" type="text" placeholder="gh" data-global-setting="ghBinaryPath" />
+    </div>
+    <p class="hint">No Windows, se informar um caminho completo, inclua a extensão <code>.exe</code>.</p>
+    <div class="field">
+      <label for="refreshIntervalSeconds">Refresh (minutos)</label>
+      <input
+        id="refreshIntervalSeconds"
+        type="number"
+        min="0.5"
+        step="0.5"
+        placeholder="1"
+        data-global-setting="refreshIntervalSeconds"
+        data-type="minutes"
+      />
+    </div>
+    <p class="hint">Usuário, caminho do gh e refresh são globais (valem para todas as actions).</p>
+
+    <script src="pi-common.js"></script>
+  </body>
+</html>

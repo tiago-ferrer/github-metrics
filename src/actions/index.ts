@@ -10,6 +10,9 @@ import { ReviewsDoneAction } from "./reviews-done.js";
 import { StarsReceivedAction } from "./stars-received.js";
 import { StatusAction } from "./status.js";
 import { PrsProjectAction } from "./prs-project.js";
+import { PushesAction } from "./pushes.js";
+import { PrCommentsAction } from "./pr-comments.js";
+import { InlineCommentsAction } from "./inline-comments.js";
 
 streamDeck.actions.registerAction(new PrsOpenAction());
 streamDeck.actions.registerAction(new ReviewRequestedAction());
@@ -20,3 +23,6 @@ streamDeck.actions.registerAction(new ReviewsDoneAction());
 streamDeck.actions.registerAction(new StarsReceivedAction());
 streamDeck.actions.registerAction(new StatusAction());
 streamDeck.actions.registerAction(new PrsProjectAction());
+streamDeck.actions.registerAction(new PushesAction());
+streamDeck.actions.registerAction(new PrCommentsAction());
+streamDeck.actions.registerAction(new InlineCommentsAction());
