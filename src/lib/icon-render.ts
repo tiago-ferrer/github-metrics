@@ -97,6 +97,56 @@ export function renderMetricIcon(model: MetricIconModel, chrome?: Chrome): strin
   return shell(`${chip}\n  ${numberOrStatus}\n  ${label}\n  ${scope}`, chrome);
 }
 
+export type BarChartModel = {
+  /** Rótulo curto da métrica (ex.: "Commits"), mostrado no topo do ícone. */
+  label: string;
+  /** 1 valor por dia já decorrido do mês corrente — índice 0 = dia 1, último índice = hoje. */
+  counts: number[];
+};
+
+const CHART_X0 = 10;
+const CHART_X1 = 134;
+const CHART_TOP = 32;
+const CHART_BASELINE = 116;
+const MONTH_ABBR = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+
+/**
+ * Gráfico de barras do mês corrente (Commits, Inline Comments, PR Comments, Pushes, PRs Abertas,
+ * Reviews Feitas) — substitui o número ao clicar na tecla (`period-metric-action.ts`). Uma barra
+ * por dia já decorrido (nunca dias futuros do mês), preenchendo a largura disponível: poucos
+ * dias decorridos rendem barras largas, o mês quase completo rende barras finas lado a lado. O
+ * dia corrente vem em amarelo; os anteriores, em verde.
+ */
+export function renderBarChartIcon(model: BarChartModel): string {
+  const dayCount = Math.max(1, model.counts.length);
+  const maxValue = Math.max(1, ...model.counts);
+  const width = CHART_X1 - CHART_X0;
+  const slotWidth = width / dayCount;
+  const gap = dayCount > 20 ? 0.6 : 1.4;
+  const barWidth = Math.max(1, slotWidth - gap);
+  const maxHeight = CHART_BASELINE - CHART_TOP;
+  const cornerRadius = Math.min(1.5, barWidth / 2);
+
+  const bars = model.counts
+    .map((value, i) => {
+      const isToday = i === dayCount - 1;
+      const color = isToday ? ACCENTS.yellow : ACCENTS.green;
+      const height = value <= 0 ? 1.5 : Math.max(4, (value / maxValue) * maxHeight);
+      const x = CHART_X0 + i * slotWidth + gap / 2;
+      const y = CHART_BASELINE - height;
+      return `<rect x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${barWidth.toFixed(2)}" height="${height.toFixed(2)}" rx="${cornerRadius.toFixed(2)}" fill="${color}"/>`;
+    })
+    .join("\n    ");
+
+  const baseline = `<line x1="${CHART_X0}" y1="${CHART_BASELINE}" x2="${CHART_X1}" y2="${CHART_BASELINE}" stroke="${THEME.border}" stroke-width="1"/>`;
+  const label = `<text x="72" y="18" fill="${THEME.textSecondary}" font-family="${FONT_STACK}" font-size="12" font-weight="600" text-anchor="middle">${escapeXml(model.label)}</text>`;
+  const today = model.counts[dayCount - 1] ?? 0;
+  const caption = `${MONTH_ABBR[new Date().getUTCMonth()]} · hoje ${formatCount(today)}`;
+  const scope = `<text x="72" y="132" fill="${THEME.muted}" font-family="${FONT_STACK}" font-size="10.5" text-anchor="middle">${escapeXml(caption)}</text>`;
+
+  return shell(`${baseline}\n  ${bars}\n  ${label}\n  ${scope}`, undefined);
+}
+
 export type StatusIconModel = {
   ok: boolean;
   /** Texto principal (ex.: "OK" ou o rótulo curto de erro). */

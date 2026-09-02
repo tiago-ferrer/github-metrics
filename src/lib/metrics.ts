@@ -86,6 +86,38 @@ function startOfTodayUtcMs(): number {
   return d.getTime();
 }
 
+function isoStartOfMonthUtc(): string {
+  const d = new Date();
+  d.setUTCDate(1);
+  d.setUTCHours(0, 0, 0, 0);
+  return d.toISOString();
+}
+
+function startOfMonthUtcMs(): number {
+  return new Date(isoStartOfMonthUtc()).getTime();
+}
+
+/** Dia do mês (1-31) de "hoje" em UTC — também o número de barras do gráfico mensal (1 por dia já decorrido, incluindo hoje). */
+function currentUtcDayOfMonth(): number {
+  return new Date().getUTCDate();
+}
+
+/**
+ * Agrupa timestamps (ms) em contagem por dia do mês corrente — 1 posição por dia já decorrido
+ * (índice 0 = dia 1, último índice = hoje). Descarta qualquer timestamp fora do mês corrente
+ * (mês anterior, ou por segurança um `createdAt`/`created_at` no futuro).
+ */
+function bucketMsByDayOfMonth(msValues: number[], dayCount: number): number[] {
+  const counts = new Array<number>(dayCount).fill(0);
+  const monthStartMs = startOfMonthUtcMs();
+  for (const ms of msValues) {
+    if (ms < monthStartMs) continue;
+    const day = new Date(ms).getUTCDate();
+    if (day >= 1 && day <= dayCount) counts[day - 1]++;
+  }
+  return counts;
+}
+
 type CreatedAtItem = { createdAt: string };
 
 /**
@@ -127,6 +159,23 @@ export async function fetchPrsOpenByPeriod(): Promise<PeriodTotals> {
 /** PRs abertas por mim, por período, restritas aos repositórios de uma organização específica. */
 export async function fetchOrgPrsOpenByPeriod(org: string): Promise<PeriodTotals> {
   return fetchPrsOpenPeriodTotals(org.trim());
+}
+
+/**
+ * Série diária do mês corrente pra PRs Abertas: 1 valor por dia já decorrido (índice 0 = dia 1,
+ * último = hoje) — quantas PRs minhas foram criadas naquele dia e ainda seguem abertas agora.
+ * Reaproveita a mesma chamada de busca de `fetchPrsOpenPeriodTotals` (1 requisição), trocando só
+ * a janela (início do mês em vez de 365 dias) e o agrupamento (por dia, não por período).
+ */
+export async function fetchPrsOpenDailyBreakdown(owner?: string): Promise<number[]> {
+  const args = ["search", "prs", "--author=@me", "--state=open", `--created=>=${isoStartOfMonthUtc()}`, "--limit=1000", "--json", "createdAt"];
+  if (owner) args.push(`--owner=${owner}`);
+  const items = await runGhJson<CreatedAtItem[]>(args);
+  const dayCount = currentUtcDayOfMonth();
+  return bucketMsByDayOfMonth(
+    items.map((item) => new Date(item.createdAt).getTime()),
+    dayCount,
+  );
 }
 
 type GitHubEvent = {
@@ -204,6 +253,35 @@ export async function fetchOrgActivityTotals(org: string): Promise<ActivityTotal
   const settings = await streamDeck.settings.getGlobalSettings<GlobalSettings>();
   const username = await resolveUsername(settings);
   return fetchActivityTotals(username, org.trim());
+}
+
+export type ActivityKind = "pushes" | "prComments" | "inlineComments";
+
+const ACTIVITY_MATCHERS: Record<ActivityKind, (e: GitHubEvent) => boolean> = {
+  pushes: isPushEvent,
+  prComments: isPrCommentEvent,
+  inlineComments: isInlineCommentEvent,
+};
+
+/**
+ * Série diária do mês corrente pra Pushes/PR Comments/Inline Comments: 1 valor por dia já
+ * decorrido. Mesma fonte de `fetchActivityTotals` (Events API, sujeita ao mesmo limite de ~90
+ * dias de histórico — dias no início do mês podem ficar incompletos se o mês for longo o
+ * suficiente pra ultrapassar essa janela), só que agrupada por dia em vez de por período. Resolve
+ * o username sozinho (mesmo padrão de `fetchOrgActivityTotals`) — o chamador só tem `org`.
+ */
+export async function fetchActivityDailyBreakdown(kind: ActivityKind, org?: string): Promise<number[]> {
+  const settings = await streamDeck.settings.getGlobalSettings<GlobalSettings>();
+  const username = await resolveUsername(settings);
+  const events = await fetchRecentEvents(username);
+  const matches = ACTIVITY_MATCHERS[kind];
+  const trimmedOrg = org?.trim();
+  const filtered = events.filter((e) => matches(e) && (!trimmedOrg || e.repo?.name?.startsWith(`${trimmedOrg}/`)));
+  const dayCount = currentUtcDayOfMonth();
+  return bucketMsByDayOfMonth(
+    filtered.map((e) => new Date(e.created_at).getTime()),
+    dayCount,
+  );
 }
 
 async function graphql<T>(query: string, variables: Record<string, string>): Promise<T> {
@@ -439,4 +517,81 @@ export async function fetchOrgPeriodContributions(org: string): Promise<OrgPerio
       ano: u.ano.totalPullRequestReviewContributions,
     },
   };
+}
+
+export type ContributionKind = "commits" | "reviewsDone";
+
+/**
+ * Limites de um dia (UTC) do mês corrente, como ISO strings — usado pra montar cada
+ * `contributionsCollection(from, to)` da query diária abaixo.
+ */
+function utcDayBoundsIso(day: number): { from: string; to: string } {
+  const now = new Date();
+  const from = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), day, 0, 0, 0)).toISOString();
+  const to = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), day, 23, 59, 59)).toISOString();
+  return { from, to };
+}
+
+/**
+ * `contributionsCollection` não tem um campo nativo de série diária — só janelas arbitrárias de
+ * `from`/`to`. Uma query com N aliases (`d1`, `d2`, ... um por dia já decorrido do mês, N ≤ 31)
+ * resolve isso numa única chamada GraphQL, validado manualmente (`gh api graphql` com 31 aliases
+ * simultâneos retorna em ~1.5s sem erro de complexidade). Bem mais barato que N chamadas
+ * separadas, no mesmo espírito de `COMBINED_QUERY`/`ORG_CONTRIBUTIONS_QUERY` (aliases em vez de
+ * repetir a requisição).
+ */
+function buildDailyContributionsQuery(dayCount: number, scoped: boolean): string {
+  const orgArg = scoped ? ", organizationID: $orgId" : "";
+  const fields = Array.from({ length: dayCount }, (_, i) => {
+    const n = i + 1;
+    return `    d${n}: contributionsCollection(from: $d${n}from, to: $d${n}to${orgArg}) {
+      totalCommitContributions
+      totalPullRequestReviewContributions
+    }`;
+  }).join("\n");
+  const varsDecl = ["$login: String!"];
+  if (scoped) varsDecl.push("$orgId: ID!");
+  for (let n = 1; n <= dayCount; n++) varsDecl.push(`$d${n}from: DateTime!`, `$d${n}to: DateTime!`);
+  return `query(${varsDecl.join(", ")}) {\n  user(login: $login) {\n${fields}\n  }\n}`;
+}
+
+type DailyContributionsResponse = {
+  data: { user: Record<string, ContributionWindow> };
+};
+
+/**
+ * Série diária do mês corrente pra Commits ou Reviews Feitas (`kind` escolhe o campo):
+ * 1 valor por dia já decorrido (índice 0 = dia 1, último = hoje). `orgId` opcional escopa cada
+ * dia à mesma organização usada em `fetchOrgPeriodContributions`.
+ */
+async function fetchContributionsDailyBreakdown(kind: ContributionKind, login: string, orgId?: string): Promise<number[]> {
+  const dayCount = currentUtcDayOfMonth();
+  const query = buildDailyContributionsQuery(dayCount, Boolean(orgId));
+  const variables: Record<string, string> = { login };
+  if (orgId) variables.orgId = orgId;
+  for (let n = 1; n <= dayCount; n++) {
+    const { from, to } = utcDayBoundsIso(n);
+    variables[`d${n}from`] = from;
+    variables[`d${n}to`] = to;
+  }
+  const res = await graphql<DailyContributionsResponse>(query, variables);
+  const user = res.data.user;
+  const field = kind === "commits" ? "totalCommitContributions" : "totalPullRequestReviewContributions";
+  return Array.from({ length: dayCount }, (_, i) => user[`d${i + 1}`][field]);
+}
+
+/** Série diária de commits do mês corrente; `org` opcional escopa à mesma organização de `fetchOrgPeriodContributions`. */
+export async function fetchCommitsDailyBreakdown(org?: string): Promise<number[]> {
+  const settings = await streamDeck.settings.getGlobalSettings<GlobalSettings>();
+  const login = await resolveUsername(settings);
+  const orgId = org?.trim() ? await resolveOrgId(org.trim()) : undefined;
+  return fetchContributionsDailyBreakdown("commits", login, orgId);
+}
+
+/** Série diária de reviews feitas do mês corrente; `org` opcional escopa à mesma organização de `fetchOrgPeriodContributions`. */
+export async function fetchReviewsDoneDailyBreakdown(org?: string): Promise<number[]> {
+  const settings = await streamDeck.settings.getGlobalSettings<GlobalSettings>();
+  const login = await resolveUsername(settings);
+  const orgId = org?.trim() ? await resolveOrgId(org.trim()) : undefined;
+  return fetchContributionsDailyBreakdown("reviewsDone", login, orgId);
 }

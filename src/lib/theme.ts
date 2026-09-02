@@ -31,6 +31,7 @@ export const ACCENTS = Object.freeze({
   cyan: "#22D3EE",
   green: "#4ADE80",
   gold: "#F2C14E",
+  yellow: "#FFD54A",
   red: "#FF6B6B",
   indigo: "#818CF8",
   pink: "#F472B6",
