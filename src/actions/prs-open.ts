@@ -34,4 +34,8 @@ export class PrsOpenAction extends PeriodMetricAction {
   protected url(): string {
     return "https://github.com/pulls";
   }
+
+  protected override celebrateIncrease(): boolean {
+    return true;
+  }
 }

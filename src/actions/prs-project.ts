@@ -7,6 +7,7 @@ import streamDeck, {
   type WillAppearEvent,
   type WillDisappearEvent,
 } from "@elgato/streamdeck";
+import { CelebrationTracker } from "../lib/celebration-tracker.js";
 import { errorLabel } from "../lib/errors.js";
 import { GhError } from "../lib/gh.js";
 import { iconAnimator, safeSetImage } from "../lib/icon-animator.js";
@@ -33,6 +34,7 @@ export class PrsProjectAction extends SingletonAction<PrsProjectSettings> {
   #lastGood = new Map<string, LastGood>();
   #lastModel = new Map<string, MetricIconModel>();
   #inFlight = new Set<string>();
+  #celebration = new CelebrationTracker();
 
   override onWillAppear(ev: WillAppearEvent<PrsProjectSettings>): void {
     if (!ev.action.isKey()) return;
@@ -49,6 +51,7 @@ export class PrsProjectAction extends SingletonAction<PrsProjectSettings> {
     this.#clearTimer(ev.action.id);
     this.#lastGood.delete(ev.action.id);
     this.#lastModel.delete(ev.action.id);
+    this.#celebration.forget(ev.action.id);
     iconAnimator.stop(ev.action.id);
   }
 
@@ -66,6 +69,8 @@ export class PrsProjectAction extends SingletonAction<PrsProjectSettings> {
     if (!ev.action.isKey()) return;
     await streamDeck.system.openUrl(this.#url(ev.action.id));
     const model = this.#lastModel.get(ev.action.id);
+    // Clicar confirma qualquer aumento pendente ("comemoração") — para de piscar em verde.
+    this.#celebration.acknowledge(ev.action.id, model?.value ?? undefined);
     if (model) {
       iconAnimator.pulse(ev.action.id, ev.action, (strength) =>
         renderMetricIcon(model, strength > 0.01 ? { color: "#FFFFFF", strength: strength * 0.55 } : undefined),
@@ -90,7 +95,18 @@ export class PrsProjectAction extends SingletonAction<PrsProjectSettings> {
     return displayName || `${owner}/${repo}`;
   }
 
-  /** Pulsa (valor mudou), respira (desatualizado/erro) ou para o ícone, conforme o estado. */
+  /**
+   * Delega ao `CelebrationTracker`: pisca em verde continuamente enquanto o valor estiver acima
+   * da última leitura confirmada pelo usuário, e só some quando ele clicar a tecla (`onKeyDown`
+   * chama `acknowledge`). Devolve `true` quando já cuidou do desenho.
+   */
+  #handleCelebration(actionId: string, action: KeyAction<PrsProjectSettings>, model: MetricIconModel): boolean {
+    if (model.value === null || !this.#celebration.observe(actionId, model.value)) return false;
+    iconAnimator.breathe(actionId, action, (strength) => renderMetricIcon(model, { color: ACCENTS.green, strength }));
+    return true;
+  }
+
+  /** Pulsa (valor mudou), respira (desatualizado/erro/mais PRs abertas do que da última vez visto) ou para o ícone, conforme o estado. */
   #applyIcon(actionId: string, action: KeyAction<PrsProjectSettings>, model: MetricIconModel, state: "ok" | "stale" | "error"): void {
     const previous = this.#lastModel.get(actionId);
     this.#lastModel.set(actionId, model);
@@ -103,6 +119,7 @@ export class PrsProjectAction extends SingletonAction<PrsProjectSettings> {
       iconAnimator.breathe(actionId, action, (strength) => renderMetricIcon(model, { color: ACCENTS.amber, strength }));
       return;
     }
+    if (this.#handleCelebration(actionId, action, model)) return;
     if (previous && previous.value !== model.value) {
       iconAnimator.pulse(actionId, action, (strength) => renderMetricIcon(model, strength > 0.01 ? { color: ACCENTS.blue, strength } : undefined));
       return;

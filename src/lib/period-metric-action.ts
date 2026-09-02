@@ -6,6 +6,7 @@ import streamDeck, {
   type WillAppearEvent,
   type WillDisappearEvent,
 } from "@elgato/streamdeck";
+import { CelebrationTracker } from "./celebration-tracker.js";
 import { errorLabel } from "./errors.js";
 import { GhError } from "./gh.js";
 import type { GlyphId } from "./glyphs.js";
@@ -37,6 +38,7 @@ export abstract class PeriodMetricAction extends SingletonAction<PeriodActionSet
   #lastPeriod = new Map<string, Period>();
   #activationChain = new Map<string, Promise<void>>();
   #tickInFlight = new Set<string>();
+  #celebration = new CelebrationTracker();
 
   protected abstract label(): string;
   /** Pictograma exibido no chip do ícone. */
@@ -51,6 +53,16 @@ export abstract class PeriodMetricAction extends SingletonAction<PeriodActionSet
   /** URL ao clicar quando a tecla está escopada a uma organização (padrão: página da org). */
   protected urlOrgScoped(org: string): string {
     return `https://github.com/${org}`;
+  }
+
+  /**
+   * Só `true` em actions cujo aumento de valor merece "comemoração" (ex.: PRs Abertas — mais
+   * PRs suas em aberto é algo pra notar). Enquanto `true`, o ícone pisca em verde continuamente
+   * a partir do momento em que o valor sobe, até o usuário clicar a tecla (não é o pulso normal,
+   * que decai sozinho em ~1.1s independente de interação).
+   */
+  protected celebrateIncrease(): boolean {
+    return false;
   }
 
   override onWillAppear(ev: WillAppearEvent<PeriodActionSettings>): void {
@@ -74,8 +86,14 @@ export abstract class PeriodMetricAction extends SingletonAction<PeriodActionSet
     const settings = await ev.action.getSettings();
     const org = settings.org?.trim();
     await streamDeck.system.openUrl(org ? this.urlOrgScoped(org) : this.url(this.#latest.snapshot));
-    // Confirmação tátil: um flash breve e neutro sobre o ícone atual, no lugar do showOk() padrão.
     const model = this.#lastModel.get(ev.action.id);
+    // Clicar confirma qualquer aumento pendente ("comemoração") — para de piscar em verde. Cada
+    // período tem sua própria base (ver #handleCelebration), por isso precisa do período atual.
+    if (this.celebrateIncrease()) {
+      const period = resolvePeriod(settings);
+      this.#celebration.acknowledge(this.#celebrationKey(ev.action.id, period), model?.value ?? undefined);
+    }
+    // Confirmação tátil: um flash breve e neutro sobre o ícone atual, no lugar do showOk() padrão.
     if (model) {
       iconAnimator.pulse(ev.action.id, ev.action, (strength) =>
         renderMetricIcon(model, strength > 0.01 ? { color: "#FFFFFF", strength: strength * 0.55 } : undefined),
@@ -137,6 +155,30 @@ export abstract class PeriodMetricAction extends SingletonAction<PeriodActionSet
     this.#lastGoodOrgTotals.delete(actionId);
     this.#lastModel.delete(actionId); // muda o escopo (org liga/desliga) — valor anterior não é comparável
     this.#lastPeriod.delete(actionId);
+    // Cada período rastreado por essa tecla tem sua própria base — limpa todos.
+    for (const period of Object.keys(PERIOD_LABEL) as Period[]) this.#celebration.forget(this.#celebrationKey(actionId, period));
+  }
+
+  /**
+   * Cada período (hoje/semana/mês/ano) mostra um número diferente pra mesma tecla — sem separar
+   * a base de comemoração por período, trocar de período veria isso como "o valor mudou" e
+   * pisc aria em verde por engano. Uma base por combinação tecla+período resolve.
+   */
+  #celebrationKey(actionId: string, period: Period): string {
+    return `${actionId}:${period}`;
+  }
+
+  /**
+   * Se `celebrateIncrease()` estiver ligado, delega ao `CelebrationTracker`: pisca em verde
+   * continuamente enquanto o valor estiver acima da última leitura confirmada pelo usuário, e só
+   * some quando ele clicar a tecla (`onKeyDown` chama `acknowledge`). Devolve `true` quando já
+   * cuidou do desenho (pulso normal e "parado" não devem rodar por cima). Só é chamado quando
+   * `allowPulse` também é `true` (mesmo período da última renderização, não troca de visualização).
+   */
+  #handleCelebration(actionId: string, period: Period, action: KeyAction<PeriodActionSettings>, model: MetricIconModel): boolean {
+    if (model.value === null || !this.#celebration.observe(this.#celebrationKey(actionId, period), model.value)) return false;
+    iconAnimator.breathe(actionId, action, (strength) => renderMetricIcon(model, { color: ACCENTS.green, strength }));
+    return true;
   }
 
   /**
@@ -145,7 +187,7 @@ export abstract class PeriodMetricAction extends SingletonAction<PeriodActionSet
    * visualização mudou — nesse caso o número quase sempre é diferente, mas isso não é uma
    * atualização de dado, é navegação, então nunca deve pulsar.
    */
-  #applyIcon(actionId: string, action: KeyAction<PeriodActionSettings>, model: MetricIconModel, state: IconState, allowPulse: boolean): void {
+  #applyIcon(actionId: string, action: KeyAction<PeriodActionSettings>, model: MetricIconModel, state: IconState, allowPulse: boolean, period: Period): void {
     const previous = this.#lastModel.get(actionId);
     this.#lastModel.set(actionId, model);
 
@@ -157,6 +199,9 @@ export abstract class PeriodMetricAction extends SingletonAction<PeriodActionSet
       iconAnimator.breathe(actionId, action, (strength) => renderMetricIcon(model, { color: ACCENTS.amber, strength }));
       return;
     }
+    // `allowPulse` também é a guarda certa aqui: só considera comemorar numa atualização de dado
+    // de verdade (mesmo período da última renderização), nunca numa troca de período de visualização.
+    if (allowPulse && this.celebrateIncrease() && this.#handleCelebration(actionId, period, action, model)) return;
     if (allowPulse && previous && previous.value !== model.value) {
       const accentColor = ACCENTS[this.accent()];
       iconAnimator.pulse(actionId, action, (strength) => renderMetricIcon(model, strength > 0.01 ? { color: accentColor, strength } : undefined));
@@ -178,7 +223,7 @@ export abstract class PeriodMetricAction extends SingletonAction<PeriodActionSet
     if (!snapshot) {
       if (error) {
         const model: MetricIconModel = { glyphId: this.glyphId(), accent: this.accent(), label: this.label(), value: null, statusText: errorLabel(error) };
-        this.#applyIcon(action.id, action, model, "error", false);
+        this.#applyIcon(action.id, action, model, "error", false, "hoje");
       }
       return;
     }
@@ -192,7 +237,7 @@ export abstract class PeriodMetricAction extends SingletonAction<PeriodActionSet
       value: this.totals(snapshot)[period],
       scopeLabel: error ? `${PERIOD_LABEL[period]} · desatualizado` : PERIOD_LABEL[period],
     };
-    this.#applyIcon(action.id, action, model, error ? "stale" : "ok", allowPulse);
+    this.#applyIcon(action.id, action, model, error ? "stale" : "ok", allowPulse, period);
     if (error) {
       // Cache válido, mas última atualização falhou: mantém o número, respira em âmbar (PLANO.md §6).
       streamDeck.logger.warn(`Exibindo cache desatualizado para ${this.label()}: ${error.message}`);
@@ -209,7 +254,7 @@ export abstract class PeriodMetricAction extends SingletonAction<PeriodActionSet
     const period = resolvePeriod(settings);
     this.#trackPeriod(action.id, period); // só re-renderiza a partir do cache — nunca pulsa aqui
     const model: MetricIconModel = { glyphId: this.glyphId(), accent: this.accent(), label: this.label(), value: cached[period], scopeLabel: `${PERIOD_LABEL[period]} · ${org}` };
-    this.#applyIcon(action.id, action, model, "ok", false);
+    this.#applyIcon(action.id, action, model, "ok", false, period);
   }
 
   async #tickOrgScoped(action: KeyAction<PeriodActionSettings>, org: string): Promise<void> {
@@ -232,7 +277,7 @@ export abstract class PeriodMetricAction extends SingletonAction<PeriodActionSet
       this.#lastGoodOrgTotals.set(action.id, totals);
       const allowPulse = this.#trackPeriod(action.id, period);
       const model: MetricIconModel = { glyphId: this.glyphId(), accent: this.accent(), label: this.label(), value: totals[period], scopeLabel: `${PERIOD_LABEL[period]} · ${org}` };
-      this.#applyIcon(action.id, action, model, "ok", allowPulse);
+      this.#applyIcon(action.id, action, model, "ok", allowPulse, period);
     } catch (err) {
       const cached = this.#lastGoodOrgTotals.get(action.id);
       this.#trackPeriod(action.id, period);
@@ -244,10 +289,10 @@ export abstract class PeriodMetricAction extends SingletonAction<PeriodActionSet
           value: cached[period],
           scopeLabel: `${PERIOD_LABEL[period]} · ${org} · desatualizado`,
         };
-        this.#applyIcon(action.id, action, model, "stale", false);
+        this.#applyIcon(action.id, action, model, "stale", false, period);
       } else {
         const model: MetricIconModel = { glyphId: this.glyphId(), accent: this.accent(), label: this.label(), value: null, statusText: errorLabel(err) };
-        this.#applyIcon(action.id, action, model, "error", false);
+        this.#applyIcon(action.id, action, model, "error", false, period);
       }
       streamDeck.logger.warn(
         `Falha ao coletar ${this.label()} de ${org}: ${err instanceof GhError ? err.message : String(err)}`,
