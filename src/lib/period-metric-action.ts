@@ -11,7 +11,7 @@ import { GhError } from "./gh.js";
 import type { GlyphId } from "./glyphs.js";
 import { iconAnimator, safeSetImage } from "./icon-animator.js";
 import { renderMetricIcon, type MetricIconModel } from "./icon-render.js";
-import { fetchOrgPeriodContributions, type MetricsSnapshot, type OrgPeriodContributions, type PeriodTotals } from "./metrics.js";
+import type { MetricsSnapshot, PeriodTotals } from "./metrics.js";
 import { metricsPoller } from "./poller.js";
 import { PERIOD_LABEL, refreshIntervalMs, resolvePeriod, type GlobalSettings, type Period, type PeriodActionSettings } from "./settings.js";
 import { ACCENTS, type AccentKey } from "./theme.js";
@@ -20,11 +20,12 @@ type IconState = "ok" | "stale" | "error";
 
 /**
  * Base para actions com período configurável pelo Property Inspector (hoje/semana/mês/ano) —
- * usada por Commits e Reviews Feitas. Mesmo ciclo de vida da SimpleMetricAction (ícone dinâmico
- * via `setImage`, filtro opcional de organização), com uma diferença: trocar só o período de
- * visualização (mesma org, mesmo dado) nunca pulsa — o pulso é reservado pra quando o número da
- * métrica muda de verdade entre atualizações. Os 4 períodos já vêm juntos numa única busca, então
- * trocar o período com a org já ativa reaproveita o resultado em vez de refazer a chamada de rede.
+ * usada por PRs Abertas, Commits e Reviews Feitas. Mesmo ciclo de vida da SimpleMetricAction
+ * (ícone dinâmico via `setImage`, filtro opcional de organização), com uma diferença: trocar só
+ * o período de visualização (mesma org, mesmo dado) nunca pulsa — o pulso é reservado pra quando
+ * o número da métrica muda de verdade entre atualizações. Os 4 períodos já vêm juntos numa única
+ * busca (`fetchOrgPeriodTotals`, própria de cada action), então trocar o período com a org já
+ * ativa reaproveita o resultado em vez de refazer a chamada de rede.
  */
 export abstract class PeriodMetricAction extends SingletonAction<PeriodActionSettings> {
   #unsubscribers = new Map<string, () => void>();
@@ -43,8 +44,8 @@ export abstract class PeriodMetricAction extends SingletonAction<PeriodActionSet
   /** Cor de destaque desta métrica (chip e pulso ao mudar de valor). */
   protected abstract accent(): AccentKey;
   protected abstract totals(snapshot: MetricsSnapshot): PeriodTotals;
-  /** Extrai commits ou reviews (conforme a action) do resultado escopado por organização. */
-  protected abstract orgTotals(contributions: OrgPeriodContributions): PeriodTotals;
+  /** Busca os 4 períodos já escopados a uma organização específica (cada action tem sua própria fonte: GraphQL de contribuições, busca REST, etc.). */
+  protected abstract fetchOrgPeriodTotals(org: string): Promise<PeriodTotals>;
   /** @param snapshot Último snapshot conhecido (pode ser usado para montar URLs com o username). */
   protected abstract url(snapshot: MetricsSnapshot | null): string;
   /** URL ao clicar quando a tecla está escopada a uma organização (padrão: página da org). */
@@ -227,8 +228,7 @@ export abstract class PeriodMetricAction extends SingletonAction<PeriodActionSet
     const settings = await action.getSettings();
     const period = resolvePeriod(settings);
     try {
-      const contributions = await fetchOrgPeriodContributions(org);
-      const totals = this.orgTotals(contributions);
+      const totals = await this.fetchOrgPeriodTotals(org);
       this.#lastGoodOrgTotals.set(action.id, totals);
       const allowPulse = this.#trackPeriod(action.id, period);
       const model: MetricIconModel = { glyphId: this.glyphId(), accent: this.accent(), label: this.label(), value: totals[period], scopeLabel: `${PERIOD_LABEL[period]} · ${org}` };

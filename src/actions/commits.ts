@@ -1,7 +1,7 @@
 import { action } from "@elgato/streamdeck";
 import type { GlyphId } from "../lib/glyphs.js";
 import { PeriodMetricAction } from "../lib/period-metric-action.js";
-import type { MetricsSnapshot, OrgPeriodContributions, PeriodTotals } from "../lib/metrics.js";
+import { fetchOrgPeriodContributions, type MetricsSnapshot, type PeriodTotals } from "../lib/metrics.js";
 import type { AccentKey } from "../lib/theme.js";
 
 @action({ UUID: "dev.tferrer.githubmetrics.commits" })
@@ -22,8 +22,8 @@ export class CommitsAction extends PeriodMetricAction {
     return snapshot.commits;
   }
 
-  protected orgTotals(contributions: OrgPeriodContributions): PeriodTotals {
-    return contributions.commits;
+  protected async fetchOrgPeriodTotals(org: string): Promise<PeriodTotals> {
+    return (await fetchOrgPeriodContributions(org)).commits;
   }
 
   protected url(snapshot: MetricsSnapshot | null): string {

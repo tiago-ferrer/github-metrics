@@ -24,7 +24,7 @@ export function refreshIntervalMs(settings: GlobalSettings): number {
   return Math.max(MIN_REFRESH_INTERVAL_SECONDS, seconds) * 1000;
 }
 
-/** Períodos suportados pelas actions "Commits" e "Reviews Feitas". */
+/** Períodos suportados pelas actions "PRs Abertas", "Commits" e "Reviews Feitas". */
 export type Period = "hoje" | "semana" | "mes" | "ano";
 
 export const PERIOD_LABEL: Record<Period, string> = {
@@ -52,11 +52,11 @@ export function resolvePeriod(settings: PeriodActionSettings): Period {
 }
 
 /**
- * Settings da action "PRs Abertas (Org)". `org` é obrigatório (login da organização); `repo`
- * é opcional — se vazio, agrega PRs de todos os repositórios da org, se preenchido, escopa
- * para um repositório específico dela (feature de organização, distinta das actions pessoais).
+ * Settings da action "PRs Project". `repo` é obrigatório (nome do repositório); `org` é
+ * opcional — se vazia, assume que o repositório é do próprio usuário. Mostra PRs de qualquer
+ * autor (visão do repositório/equipe, não da conta pessoal — diferente das outras actions).
  */
-export type OrgActionSettings = {
+export type PrsProjectSettings = {
   org?: string;
   repo?: string;
 };

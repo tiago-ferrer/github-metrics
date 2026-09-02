@@ -9,7 +9,7 @@ import { CommitsAction } from "./commits.js";
 import { ReviewsDoneAction } from "./reviews-done.js";
 import { StarsReceivedAction } from "./stars-received.js";
 import { StatusAction } from "./status.js";
-import { OrgPrsOpenAction } from "./org-prs-open.js";
+import { PrsProjectAction } from "./prs-project.js";
 
 streamDeck.actions.registerAction(new PrsOpenAction());
 streamDeck.actions.registerAction(new ReviewRequestedAction());
@@ -19,4 +19,4 @@ streamDeck.actions.registerAction(new CommitsAction());
 streamDeck.actions.registerAction(new ReviewsDoneAction());
 streamDeck.actions.registerAction(new StarsReceivedAction());
 streamDeck.actions.registerAction(new StatusAction());
-streamDeck.actions.registerAction(new OrgPrsOpenAction());
+streamDeck.actions.registerAction(new PrsProjectAction());

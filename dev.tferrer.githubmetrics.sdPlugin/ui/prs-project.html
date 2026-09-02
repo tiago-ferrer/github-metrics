@@ -5,20 +5,20 @@
     <link rel="stylesheet" href="pi-common.css" />
   </head>
   <body>
-    <h1>Organização</h1>
-    <div class="field">
-      <label for="org">Organização</label>
-      <input id="org" type="text" placeholder="ex.: github" data-setting="org" />
-    </div>
+    <h1>Repositório</h1>
     <div class="field">
       <label for="repo">Repositório</label>
-      <input id="repo" type="text" placeholder="opcional — toda a org" data-setting="repo" />
+      <input id="repo" type="text" placeholder="obrigatório — ex.: cli" data-setting="repo" />
+    </div>
+    <div class="field">
+      <label for="org">Organização</label>
+      <input id="org" type="text" placeholder="opcional — sua própria conta" data-setting="org" />
     </div>
     <p class="hint">
-      Informe o login da organização (o nome que aparece em <code>github.com/&lt;org&gt;</code>).
-      Deixe "Repositório" em branco para somar as PRs abertas de todos os repositórios da
-      organização, ou preencha para ver apenas as de um repositório específico (ex.: <code>cli</code>
-      para <code>github.com/cli/cli</code>).
+      Mostra as PRs abertas do repositório informado (de qualquer autor, não só as suas).
+      Deixe "Organização" em branco para usar seu próprio usuário como dono do repositório (ex.:
+      <code>github.com/&lt;seu-usuário&gt;/&lt;repo&gt;</code>), ou preencha com o login de uma
+      organização (ex.: <code>github</code> para <code>github.com/github/cli</code>).
     </p>
 
     <h1>Avançado</h1>

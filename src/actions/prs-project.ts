@@ -11,27 +11,30 @@ import { errorLabel } from "../lib/errors.js";
 import { GhError } from "../lib/gh.js";
 import { iconAnimator, safeSetImage } from "../lib/icon-animator.js";
 import { renderMetricIcon, type MetricIconModel } from "../lib/icon-render.js";
-import { fetchOrgOpenPrCount } from "../lib/org-prs.js";
-import { refreshIntervalMs, type GlobalSettings, type OrgActionSettings } from "../lib/settings.js";
+import { fetchRepoOpenPrCount } from "../lib/repo-prs.js";
+import { refreshIntervalMs, type GlobalSettings, type PrsProjectSettings } from "../lib/settings.js";
 import { ACCENTS } from "../lib/theme.js";
 
+type LastGood = { count: number; owner: string; repo: string };
+
 /**
- * PRs abertas escopadas a uma organização (todos os repos) ou, se `repo` for informado nas
- * settings da tecla, a um único repositório dela. Cada tecla configura sua própria org/repo
- * (settings por instância, como o período de Commits/Reviews) — por isso não usa o poller
- * central (que só cobre a conta pessoal do usuário), tem timer próprio como `status.ts`.
- * Ícone dinâmico via `setImage`: pulsa na cor da métrica quando o número muda, respira em
- * âmbar mostrando o último valor válido se a busca mais recente falhar (PLANO.md §6), ou em
- * vermelho com o rótulo do erro se não houver nenhum valor em cache ainda.
+ * PRs abertas de um repositório específico (qualquer autor — é a visão agregada do
+ * repositório/equipe, não "minhas PRs"). "Repositório" é obrigatório; "Organização" é opcional
+ * — se vazia, assume que o repositório é seu (mesma conta pessoal resolvida via
+ * `githubUsername`/`gh api user`). Cada tecla configura seu próprio repo/org (settings por
+ * instância) — por isso não usa o poller central, tem timer próprio como `status.ts`.
+ * Ícone dinâmico via `setImage`: pulsa na cor da métrica quando o número muda, respira em âmbar
+ * mostrando o último valor válido se a busca mais recente falhar (PLANO.md §6), ou em vermelho
+ * com o rótulo do erro se não houver nenhum valor em cache ainda.
  */
 @action({ UUID: "dev.tferrer.githubmetrics.org-prs-open" })
-export class OrgPrsOpenAction extends SingletonAction<OrgActionSettings> {
+export class PrsProjectAction extends SingletonAction<PrsProjectSettings> {
   #timers = new Map<string, ReturnType<typeof setInterval>>();
-  #lastGood = new Map<string, number>();
+  #lastGood = new Map<string, LastGood>();
   #lastModel = new Map<string, MetricIconModel>();
   #inFlight = new Set<string>();
 
-  override onWillAppear(ev: WillAppearEvent<OrgActionSettings>): void {
+  override onWillAppear(ev: WillAppearEvent<PrsProjectSettings>): void {
     if (!ev.action.isKey()) return;
     const action = ev.action;
     // Idempotente: se onWillAppear disparar mais de uma vez pra mesma tecla (o app pode fazer
@@ -42,7 +45,7 @@ export class OrgPrsOpenAction extends SingletonAction<OrgActionSettings> {
     void this.#startTimer(action);
   }
 
-  override onWillDisappear(ev: WillDisappearEvent<OrgActionSettings>): void {
+  override onWillDisappear(ev: WillDisappearEvent<PrsProjectSettings>): void {
     this.#clearTimer(ev.action.id);
     this.#lastGood.delete(ev.action.id);
     this.#lastModel.delete(ev.action.id);
@@ -55,14 +58,13 @@ export class OrgPrsOpenAction extends SingletonAction<OrgActionSettings> {
     this.#timers.delete(actionId);
   }
 
-  override onDidReceiveSettings(ev: DidReceiveSettingsEvent<OrgActionSettings>): void {
+  override onDidReceiveSettings(ev: DidReceiveSettingsEvent<PrsProjectSettings>): void {
     if (ev.action.isKey()) void this.#tick(ev.action);
   }
 
-  override async onKeyDown(ev: KeyDownEvent<OrgActionSettings>): Promise<void> {
+  override async onKeyDown(ev: KeyDownEvent<PrsProjectSettings>): Promise<void> {
     if (!ev.action.isKey()) return;
-    const settings = await ev.action.getSettings();
-    await streamDeck.system.openUrl(this.#url(settings));
+    await streamDeck.system.openUrl(this.#url(ev.action.id));
     const model = this.#lastModel.get(ev.action.id);
     if (model) {
       iconAnimator.pulse(ev.action.id, ev.action, (strength) =>
@@ -71,22 +73,20 @@ export class OrgPrsOpenAction extends SingletonAction<OrgActionSettings> {
     }
   }
 
-  async #startTimer(action: KeyAction<OrgActionSettings>): Promise<void> {
+  async #startTimer(action: KeyAction<PrsProjectSettings>): Promise<void> {
     const globalSettings = await streamDeck.settings.getGlobalSettings<GlobalSettings>();
     const timer = setInterval(() => void this.#tick(action), refreshIntervalMs(globalSettings));
     this.#timers.set(action.id, timer);
   }
 
-  #url(settings: OrgActionSettings): string {
-    const org = settings.org?.trim();
-    const repo = settings.repo?.trim();
-    if (!org) return "https://github.com";
-    if (repo) return `https://github.com/${org}/${repo}/pulls`;
-    return `https://github.com/search?q=${encodeURIComponent(`is:pr is:open org:${org}`)}&type=pullrequests`;
+  /** Usa o dono/repo da última busca bem-sucedida — evita resolver de novo só pra montar a URL. */
+  #url(actionId: string): string {
+    const cached = this.#lastGood.get(actionId);
+    return cached ? `https://github.com/${cached.owner}/${cached.repo}/pulls` : "https://github.com";
   }
 
   /** Pulsa (valor mudou), respira (desatualizado/erro) ou para o ícone, conforme o estado. */
-  #applyIcon(actionId: string, action: KeyAction<OrgActionSettings>, model: MetricIconModel, state: "ok" | "stale" | "error"): void {
+  #applyIcon(actionId: string, action: KeyAction<PrsProjectSettings>, model: MetricIconModel, state: "ok" | "stale" | "error"): void {
     const previous = this.#lastModel.get(actionId);
     this.#lastModel.set(actionId, model);
 
@@ -106,7 +106,7 @@ export class OrgPrsOpenAction extends SingletonAction<OrgActionSettings> {
     safeSetImage(action, renderMetricIcon(model));
   }
 
-  async #tick(action: KeyAction<OrgActionSettings>): Promise<void> {
+  async #tick(action: KeyAction<PrsProjectSettings>): Promise<void> {
     // Trava por tecla: se o timer, onDidReceiveSettings e a chamada inicial em onWillAppear
     // colidirem (ou qualquer evento disparar de novo antes da busca anterior terminar), ignora
     // a chamada nova em vez de empilhar execFile concorrentes pra mesma tecla.
@@ -119,32 +119,37 @@ export class OrgPrsOpenAction extends SingletonAction<OrgActionSettings> {
     }
   }
 
-  async #tickUnguarded(action: KeyAction<OrgActionSettings>): Promise<void> {
+  async #tickUnguarded(action: KeyAction<PrsProjectSettings>): Promise<void> {
     const settings = await action.getSettings();
-    const org = settings.org?.trim();
-    if (!org) {
-      const model: MetricIconModel = { glyphId: "org-prs-open", accent: "blue", label: "PRs", value: null, statusText: "Config.\norg" };
+    const repo = settings.repo?.trim();
+    if (!repo) {
+      const model: MetricIconModel = { glyphId: "prs-project", accent: "blue", label: "PRs", value: null, statusText: "Config.\nrepo" };
       this.#applyIcon(action.id, action, model, "error");
       return;
     }
-    const repo = settings.repo?.trim();
-    const scopeLabel = repo || org;
+    const org = settings.org?.trim();
     try {
-      const count = await fetchOrgOpenPrCount(org, repo);
-      this.#lastGood.set(action.id, count);
-      const model: MetricIconModel = { glyphId: "org-prs-open", accent: "blue", label: "PRs", value: count, scopeLabel };
+      const { count, owner } = await fetchRepoOpenPrCount(repo, org);
+      this.#lastGood.set(action.id, { count, owner, repo });
+      const model: MetricIconModel = { glyphId: "prs-project", accent: "blue", label: "PRs", value: count, scopeLabel: `${owner}/${repo}` };
       this.#applyIcon(action.id, action, model, "ok");
     } catch (err) {
       const cached = this.#lastGood.get(action.id);
-      if (cached !== undefined) {
-        const model: MetricIconModel = { glyphId: "org-prs-open", accent: "blue", label: "PRs", value: cached, scopeLabel: `${scopeLabel} · desatualizado` };
+      if (cached) {
+        const model: MetricIconModel = {
+          glyphId: "prs-project",
+          accent: "blue",
+          label: "PRs",
+          value: cached.count,
+          scopeLabel: `${cached.owner}/${cached.repo} · desatualizado`,
+        };
         this.#applyIcon(action.id, action, model, "stale");
       } else {
-        const model: MetricIconModel = { glyphId: "org-prs-open", accent: "blue", label: "PRs", value: null, statusText: errorLabel(err) };
+        const model: MetricIconModel = { glyphId: "prs-project", accent: "blue", label: "PRs", value: null, statusText: errorLabel(err) };
         this.#applyIcon(action.id, action, model, "error");
       }
       streamDeck.logger.warn(
-        `Falha ao coletar PRs de ${scopeLabel}: ${err instanceof GhError ? err.message : String(err)}`,
+        `Falha ao coletar PRs de ${org ? `${org}/${repo}` : repo}: ${err instanceof GhError ? err.message : String(err)}`,
       );
     }
   }

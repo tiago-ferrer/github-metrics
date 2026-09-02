@@ -12,7 +12,7 @@ export type GlyphId =
   | "commits"
   | "reviews-done"
   | "stars-received"
-  | "org-prs-open"
+  | "prs-project"
   | "status-ok"
   | "status-error";
 
@@ -42,7 +42,7 @@ const GLYPHS: Record<GlyphId, (color: string) => string> = {
     <path d="M7.8 11 L9.6 12.8 L14.2 8.2" stroke="${c}"/>`,
   "stars-received": (c) => `
     <path d="M10 2.5 L12.35 7.55 L18 8.35 L13.9 12.2 L14.9 17.5 L10 14.9 L5.1 17.5 L6.1 12.2 L2 8.35 L7.65 7.55 Z" stroke="${c}"/>`,
-  "org-prs-open": (c) => `
+  "prs-project": (c) => `
     <rect x="3.5" y="3" width="9" height="14" rx="1" stroke="${c}"/>
     <path d="M12.5 8 H15.5 Q16.5 8 16.5 9 V17 H12.5" stroke="${c}"/>
     <rect x="5.7" y="5.6" width="1.8" height="1.8" fill="${c}" stroke="none"/>

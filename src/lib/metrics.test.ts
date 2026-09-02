@@ -14,11 +14,12 @@ const runGhJson = vi.fn(async (..._args: unknown[]): Promise<unknown> => ({}));
 vi.mock("./gh.js", () => ({ runGh, runGhJson }));
 
 const {
-  fetchOrgScopedPrsOpen,
   fetchOrgScopedReviewRequested,
   fetchOrgScopedIssuesAssigned,
   fetchOrgScopedNotifications,
   fetchOrgPeriodContributions,
+  fetchPrsOpenByPeriod,
+  fetchOrgPrsOpenByPeriod,
 } = await import("./metrics.js");
 
 beforeEach(() => {
@@ -28,13 +29,6 @@ beforeEach(() => {
 });
 
 describe("métricas pessoais escopadas por organização (buscas)", () => {
-  it("PRs abertas: mantém --author=@me e soma --owner", async () => {
-    await fetchOrgScopedPrsOpen("minha-org");
-    expect(runGh).toHaveBeenCalledWith(
-      expect.arrayContaining(["search", "prs", "--author=@me", "--state=open", "--owner=minha-org"]),
-    );
-  });
-
   it("Review solicitada: mantém --review-requested=@me e soma --owner", async () => {
     await fetchOrgScopedReviewRequested("minha-org");
     expect(runGh).toHaveBeenCalledWith(
@@ -50,8 +44,29 @@ describe("métricas pessoais escopadas por organização (buscas)", () => {
   });
 
   it("remove espaços extras do nome da org", async () => {
-    await fetchOrgScopedPrsOpen("  minha-org  ");
+    await fetchOrgScopedReviewRequested("  minha-org  ");
     expect(runGh).toHaveBeenCalledWith(expect.arrayContaining(["--owner=minha-org"]));
+  });
+});
+
+describe("fetchPrsOpenByPeriod / fetchOrgPrsOpenByPeriod", () => {
+  it("busca as 4 janelas com --author=@me, --state=open e --created, sem --owner", async () => {
+    const totals = await fetchPrsOpenByPeriod();
+    expect(totals).toEqual({ hoje: 3, semana: 3, mes: 3, ano: 3 });
+    for (const call of runGh.mock.calls) {
+      const args = call[0] as string[];
+      expect(args).toEqual(expect.arrayContaining(["search", "prs", "--author=@me", "--state=open"]));
+      expect(args.some((a) => a.startsWith("--created=>="))).toBe(true);
+      expect(args.some((a) => a.startsWith("--owner="))).toBe(false);
+    }
+  });
+
+  it("versão escopada por organização soma --owner em todas as 4 chamadas", async () => {
+    const totals = await fetchOrgPrsOpenByPeriod("minha-org");
+    expect(totals).toEqual({ hoje: 3, semana: 3, mes: 3, ano: 3 });
+    for (const call of runGh.mock.calls) {
+      expect(call[0] as string[]).toEqual(expect.arrayContaining(["--owner=minha-org"]));
+    }
   });
 });
 

@@ -32,9 +32,9 @@
     {
       "UUID": "dev.tferrer.githubmetrics.prs-open",
       "Name": "PRs Abertas",
-      "Tooltip": "Quantidade de Pull Requests abertas por você (opcionalmente restrita a uma organização)",
+      "Tooltip": "PRs que você abriu no período selecionado e que ainda seguem abertas (opcionalmente restrita a uma organização)",
       "Icon": "imgs/actions/prs-open/icon",
-      "PropertyInspectorPath": "ui/simple-metric-org.html",
+      "PropertyInspectorPath": "ui/period-metric.html",
       "Controllers": [
         "Keypad"
       ],
@@ -136,16 +136,16 @@
     },
     {
       "UUID": "dev.tferrer.githubmetrics.org-prs-open",
-      "Name": "PRs Abertas (Org)",
-      "Tooltip": "PRs abertas em uma organização inteira, ou em um repositório específico dela",
-      "Icon": "imgs/actions/org-prs-open/icon",
-      "PropertyInspectorPath": "ui/org-prs.html",
+      "Name": "PRs Project",
+      "Tooltip": "PRs abertas de um repositório específico (de qualquer autor), organização opcional",
+      "Icon": "imgs/actions/prs-project/icon",
+      "PropertyInspectorPath": "ui/prs-project.html",
       "Controllers": [
         "Keypad"
       ],
       "States": [
         {
-          "Image": "imgs/actions/org-prs-open/icon"
+          "Image": "imgs/actions/prs-project/icon"
         }
       ]
     },

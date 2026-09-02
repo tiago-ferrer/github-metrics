@@ -1,11 +1,16 @@
 import { action } from "@elgato/streamdeck";
 import type { GlyphId } from "../lib/glyphs.js";
-import { SimpleMetricAction } from "../lib/simple-metric-action.js";
-import { fetchOrgScopedPrsOpen, type MetricsSnapshot } from "../lib/metrics.js";
+import { PeriodMetricAction } from "../lib/period-metric-action.js";
+import { fetchOrgPrsOpenByPeriod, type MetricsSnapshot, type PeriodTotals } from "../lib/metrics.js";
 import type { AccentKey } from "../lib/theme.js";
 
+/**
+ * PRs abertas por mim (`@me`) criadas no período selecionado (hoje/semana/mês/ano) e que ainda
+ * seguem abertas agora — não é "todas as PRs abertas agora", é "quantas das que eu abri nesse
+ * período continuam em aberto".
+ */
 @action({ UUID: "dev.tferrer.githubmetrics.prs-open" })
-export class PrsOpenAction extends SimpleMetricAction {
+export class PrsOpenAction extends PeriodMetricAction {
   protected label(): string {
     return "PRs";
   }
@@ -18,15 +23,15 @@ export class PrsOpenAction extends SimpleMetricAction {
     return "blue";
   }
 
-  protected value(snapshot: MetricsSnapshot): number {
+  protected totals(snapshot: MetricsSnapshot): PeriodTotals {
     return snapshot.prsOpen;
+  }
+
+  protected fetchOrgPeriodTotals(org: string): Promise<PeriodTotals> {
+    return fetchOrgPrsOpenByPeriod(org);
   }
 
   protected url(): string {
     return "https://github.com/pulls";
-  }
-
-  protected override fetchOrgScoped(org: string): Promise<number> {
-    return fetchOrgScopedPrsOpen(org);
   }
 }

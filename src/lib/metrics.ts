@@ -7,7 +7,7 @@ export type PeriodTotals = Record<Period, number>;
 export type MetricsSnapshot = {
   fetchedAt: number;
   username: string;
-  prsOpen: number;
+  prsOpen: PeriodTotals;
   reviewRequested: number;
   issuesAssigned: number;
   notifications: number;
@@ -16,7 +16,7 @@ export type MetricsSnapshot = {
   reviewsDone: PeriodTotals;
 };
 
-async function resolveUsername(settings: GlobalSettings): Promise<string> {
+export async function resolveUsername(settings: GlobalSettings): Promise<string> {
   const custom = settings.githubUsername?.trim();
   if (custom) return custom;
   return runGh(["api", "user", "--jq", ".login"]);
@@ -35,11 +35,6 @@ export async function countSearch(args: string[]): Promise<number> {
 async function fetchNotifications(): Promise<number> {
   const out = await runGh(["api", "notifications", "--jq", "length"]);
   return Number(out || 0);
-}
-
-/** PRs abertas por mim (`@me`), restritas aos repositórios de uma organização específica. */
-export async function fetchOrgScopedPrsOpen(org: string): Promise<number> {
-  return countSearch(["search", "prs", "--author=@me", "--state=open", `--owner=${org.trim()}`]);
 }
 
 /** PRs com minha review solicitada, restritas aos repositórios de uma organização específica. */
@@ -76,6 +71,38 @@ function isoDaysAgo(days: number): string {
   const d = new Date();
   d.setUTCDate(d.getUTCDate() - days);
   return d.toISOString();
+}
+
+async function fetchPrsOpenCount(createdFrom: string, owner?: string): Promise<number> {
+  const args = ["search", "prs", "--author=@me", "--state=open", `--created=>=${createdFrom}`];
+  if (owner) args.push(`--owner=${owner}`);
+  return countSearch(args);
+}
+
+/**
+ * PRs abertas por mim (`@me`) criadas dentro de cada janela de tempo e que ainda estão abertas
+ * agora — não é "todas as PRs abertas agora" (isso não combina com período: uma PR pode estar
+ * aberta há meses). `ano` usa uma janela literal de 365 dias, já que aqui não tem o mesmo "from
+ * omitido = ano corrido" que o GraphQL do `contributionsCollection` oferece.
+ */
+async function fetchPrsOpenPeriodTotals(owner?: string): Promise<PeriodTotals> {
+  const [hoje, semana, mes, ano] = await Promise.all([
+    fetchPrsOpenCount(isoStartOfTodayUtc(), owner),
+    fetchPrsOpenCount(isoDaysAgo(7), owner),
+    fetchPrsOpenCount(isoDaysAgo(30), owner),
+    fetchPrsOpenCount(isoDaysAgo(365), owner),
+  ]);
+  return { hoje, semana, mes, ano };
+}
+
+/** PRs abertas por mim, por período, em toda a conta pessoal (usado pelo poller central). */
+export async function fetchPrsOpenByPeriod(): Promise<PeriodTotals> {
+  return fetchPrsOpenPeriodTotals();
+}
+
+/** PRs abertas por mim, por período, restritas aos repositórios de uma organização específica. */
+export async function fetchOrgPrsOpenByPeriod(org: string): Promise<PeriodTotals> {
+  return fetchPrsOpenPeriodTotals(org.trim());
 }
 
 async function graphql<T>(query: string, variables: Record<string, string>): Promise<T> {
@@ -185,7 +212,7 @@ export async function fetchSnapshot(): Promise<MetricsSnapshot> {
   const now = new Date().toISOString();
 
   const [prsOpen, reviewRequested, issuesAssigned, notifications, combined] = await Promise.all([
-    countSearch(["search", "prs", "--author=@me", "--state=open"]),
+    fetchPrsOpenByPeriod(),
     countSearch(["search", "prs", "--review-requested=@me", "--state=open"]),
     countSearch(["search", "issues", "--assignee=@me", "--state=open"]),
     fetchNotifications(),
