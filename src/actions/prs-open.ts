@@ -1,7 +1,7 @@
 import { action } from "@elgato/streamdeck";
 import type { GlyphId } from "../lib/glyphs.js";
 import { PeriodMetricAction } from "../lib/period-metric-action.js";
-import { fetchOrgPrsOpenByPeriod, type MetricsSnapshot, type PeriodTotals } from "../lib/metrics.js";
+import { fetchOrgPrsOpenByPeriod, fetchPrsOpenDailyBreakdown, type MetricsSnapshot, type PeriodTotals } from "../lib/metrics.js";
 import type { AccentKey } from "../lib/theme.js";
 
 /**
@@ -31,8 +31,8 @@ export class PrsOpenAction extends PeriodMetricAction {
     return fetchOrgPrsOpenByPeriod(org);
   }
 
-  protected url(): string {
-    return "https://github.com/pulls";
+  protected fetchDailyBreakdown(org?: string): Promise<number[]> {
+    return fetchPrsOpenDailyBreakdown(org);
   }
 
   protected override celebrateIncrease(): boolean {

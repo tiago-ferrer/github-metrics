@@ -1,7 +1,7 @@
 import { action } from "@elgato/streamdeck";
 import type { GlyphId } from "../lib/glyphs.js";
 import { PeriodMetricAction } from "../lib/period-metric-action.js";
-import { fetchOrgActivityTotals, type MetricsSnapshot, type PeriodTotals } from "../lib/metrics.js";
+import { fetchActivityDailyBreakdown, fetchOrgActivityTotals, type MetricsSnapshot, type PeriodTotals } from "../lib/metrics.js";
 import type { AccentKey } from "../lib/theme.js";
 
 /**
@@ -32,7 +32,7 @@ export class PushesAction extends PeriodMetricAction {
     return (await fetchOrgActivityTotals(org)).pushes;
   }
 
-  protected url(snapshot: MetricsSnapshot | null): string {
-    return snapshot ? `https://github.com/${snapshot.username}` : "https://github.com";
+  protected fetchDailyBreakdown(org?: string): Promise<number[]> {
+    return fetchActivityDailyBreakdown("pushes", org);
   }
 }

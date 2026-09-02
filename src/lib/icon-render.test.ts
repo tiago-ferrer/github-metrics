@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { renderMetricIcon, renderStatusIcon } from "./icon-render.js";
+import { renderBarChartIcon, renderMetricIcon, renderStatusIcon } from "./icon-render.js";
 
 describe("renderMetricIcon", () => {
   it("produz um SVG 144x144 válido com o número formatado e o rótulo", () => {
@@ -59,6 +59,26 @@ describe("renderMetricIcon", () => {
     // "rx=\"21.4\"" é o raio do anel externo do chrome — só aparece quando o efeito está ativo.
     expect(withChrome).toContain('rx="21.4"');
     expect(withoutChrome).not.toContain('rx="21.4"');
+  });
+});
+
+describe("renderBarChartIcon", () => {
+  it("desenha 1 barra por dia — dias passados em verde, hoje (última posição) em amarelo", () => {
+    const svg = renderBarChartIcon({ label: "Commits", counts: [1, 0, 3, 2, 5] });
+    expect((svg.match(/#FFD54A/g) ?? []).length).toBe(1); // só a última barra (hoje)
+    expect((svg.match(/#4ADE80/g) ?? []).length).toBe(4); // as 4 anteriores
+    expect(svg).toContain(">Commits<");
+  });
+
+  it("mostra o mês e a contagem de hoje na legenda inferior", () => {
+    const svg = renderBarChartIcon({ label: "Pushes", counts: [0, 0, 4] });
+    expect(svg).toContain("hoje 4");
+  });
+
+  it("dia sem nenhum evento ainda desenha uma barra (não fica em branco)", () => {
+    const svg = renderBarChartIcon({ label: "PRs", counts: [0] });
+    expect(svg).toContain("<rect");
+    expect(svg).toContain(">PRs<");
   });
 });
 

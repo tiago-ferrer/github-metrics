@@ -11,13 +11,16 @@ import { errorLabel } from "./errors.js";
 import { GhError } from "./gh.js";
 import type { GlyphId } from "./glyphs.js";
 import { iconAnimator, safeSetImage } from "./icon-animator.js";
-import { renderMetricIcon, type MetricIconModel } from "./icon-render.js";
+import { renderBarChartIcon, renderMetricIcon, type MetricIconModel } from "./icon-render.js";
 import type { MetricsSnapshot, PeriodTotals } from "./metrics.js";
 import { metricsPoller } from "./poller.js";
 import { PERIOD_LABEL, refreshIntervalMs, resolvePeriod, type GlobalSettings, type Period, type PeriodActionSettings } from "./settings.js";
 import { ACCENTS, type AccentKey } from "./theme.js";
 
 type IconState = "ok" | "stale" | "error";
+
+/** Tempo que o gráfico de barras fica em tela antes de voltar sozinho pro número (clicar de novo volta na hora). */
+const CHART_REVERT_MS = 9000;
 
 /**
  * Base para actions com período configurável pelo Property Inspector (hoje/semana/mês/ano) —
@@ -35,10 +38,14 @@ export abstract class PeriodMetricAction extends SingletonAction<PeriodActionSet
   #latest: { snapshot: MetricsSnapshot | null; error: GhError | null } = { snapshot: null, error: null };
   #lastGoodOrgTotals = new Map<string, PeriodTotals>();
   #lastModel = new Map<string, MetricIconModel>();
+  #lastState = new Map<string, IconState>();
   #lastPeriod = new Map<string, Period>();
   #activationChain = new Map<string, Promise<void>>();
   #tickInFlight = new Set<string>();
   #celebration = new CelebrationTracker();
+  /** Teclas mostrando o gráfico de barras no momento (em vez do número) — ver `#showChart`/`#revertToNumber`. */
+  #chartShowing = new Set<string>();
+  #revertTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
   protected abstract label(): string;
   /** Pictograma exibido no chip do ícone. */
@@ -48,12 +55,13 @@ export abstract class PeriodMetricAction extends SingletonAction<PeriodActionSet
   protected abstract totals(snapshot: MetricsSnapshot): PeriodTotals;
   /** Busca os 4 períodos já escopados a uma organização específica (cada action tem sua própria fonte: GraphQL de contribuições, busca REST, etc.). */
   protected abstract fetchOrgPeriodTotals(org: string): Promise<PeriodTotals>;
-  /** @param snapshot Último snapshot conhecido (pode ser usado para montar URLs com o username). */
-  protected abstract url(snapshot: MetricsSnapshot | null): string;
-  /** URL ao clicar quando a tecla está escopada a uma organização (padrão: página da org). */
-  protected urlOrgScoped(org: string): string {
-    return `https://github.com/${org}`;
-  }
+  /**
+   * Série diária do mês corrente (1 valor por dia já decorrido, índice 0 = dia 1) pro gráfico de
+   * barras exibido ao clicar na tecla — cada action busca à sua própria fonte de dados (mesma
+   * escolha de `fetchOrgPeriodTotals`: GraphQL de contribuições, busca REST ou Events API).
+   * `org` reflete a mesma organização configurada na tecla, se houver.
+   */
+  protected abstract fetchDailyBreakdown(org?: string): Promise<number[]>;
 
   /**
    * Só `true` em actions cujo aumento de valor merece "comemoração" (ex.: PRs Abertas — mais
@@ -74,6 +82,8 @@ export abstract class PeriodMetricAction extends SingletonAction<PeriodActionSet
     this.#deactivate(ev.action.id);
     this.#activationChain.delete(ev.action.id);
     this.#tickInFlight.delete(ev.action.id);
+    this.#clearRevertTimer(ev.action.id);
+    this.#chartShowing.delete(ev.action.id);
     iconAnimator.stop(ev.action.id);
   }
 
@@ -81,24 +91,79 @@ export abstract class PeriodMetricAction extends SingletonAction<PeriodActionSet
     if (ev.action.isKey()) void this.#activate(ev.action);
   }
 
+  /**
+   * Clicar alterna entre número e gráfico de barras do mês corrente (não abre mais o GitHub no
+   * navegador — PLANO.md/histórico tinham `openUrl` aqui antes dessa feature). Gráfico já em
+   * tela: volta pro número na hora, cancelando a reversão automática. Número em tela: busca a
+   * série diária e mostra o gráfico, que volta sozinho depois de `CHART_REVERT_MS`.
+   */
   override async onKeyDown(ev: KeyDownEvent<PeriodActionSettings>): Promise<void> {
     if (!ev.action.isKey()) return;
+    const actionId = ev.action.id;
     const settings = await ev.action.getSettings();
-    const org = settings.org?.trim();
-    await streamDeck.system.openUrl(org ? this.urlOrgScoped(org) : this.url(this.#latest.snapshot));
-    const model = this.#lastModel.get(ev.action.id);
-    // Clicar confirma qualquer aumento pendente ("comemoração") — para de piscar em verde. Cada
-    // período tem sua própria base (ver #handleCelebration), por isso precisa do período atual.
+    const model = this.#lastModel.get(actionId);
+    // Clicar sempre confirma qualquer aumento pendente ("comemoração") — para de piscar em verde,
+    // independente de estar mostrando número ou gráfico. Cada período tem sua própria base (ver
+    // #handleCelebration), por isso precisa do período atual.
     if (this.celebrateIncrease()) {
       const period = resolvePeriod(settings);
-      this.#celebration.acknowledge(this.#celebrationKey(ev.action.id, period), model?.value ?? undefined);
+      this.#celebration.acknowledge(this.#celebrationKey(actionId, period), model?.value ?? undefined);
     }
-    // Confirmação tátil: um flash breve e neutro sobre o ícone atual, no lugar do showOk() padrão.
-    if (model) {
-      iconAnimator.pulse(ev.action.id, ev.action, (strength) =>
-        renderMetricIcon(model, strength > 0.01 ? { color: "#FFFFFF", strength: strength * 0.55 } : undefined),
-      );
+
+    if (this.#chartShowing.has(actionId)) {
+      this.#revertToNumber(actionId, ev.action);
+      return;
     }
+    await this.#showChart(actionId, ev.action, settings.org?.trim());
+  }
+
+  /** Busca a série diária e desenha o gráfico de barras, agendando a reversão automática pro número. */
+  async #showChart(actionId: string, action: KeyAction<PeriodActionSettings>, org: string | undefined): Promise<void> {
+    this.#chartShowing.add(actionId);
+    iconAnimator.stop(actionId);
+    try {
+      const counts = await this.fetchDailyBreakdown(org);
+      // Um segundo clique pode ter chamado `#revertToNumber` (removendo de `#chartShowing`)
+      // enquanto essa busca ainda estava em andamento — sem essa checagem, a busca em atraso
+      // sobrescreveria o número que o usuário já tinha voltado a ver.
+      if (!this.#chartShowing.has(actionId)) return;
+      safeSetImage(action, renderBarChartIcon({ label: this.label(), counts }));
+      this.#scheduleRevert(actionId, action);
+    } catch (err) {
+      streamDeck.logger.warn(`Falha ao buscar gráfico diário de ${this.label()}: ${err instanceof GhError ? err.message : String(err)}`);
+      if (!this.#chartShowing.has(actionId)) return;
+      this.#chartShowing.delete(actionId);
+      this.#redrawLast(actionId, action);
+    }
+  }
+
+  #scheduleRevert(actionId: string, action: KeyAction<PeriodActionSettings>): void {
+    this.#clearRevertTimer(actionId);
+    const timer = setTimeout(() => this.#revertToNumber(actionId, action), CHART_REVERT_MS);
+    this.#revertTimers.set(actionId, timer);
+  }
+
+  #clearRevertTimer(actionId: string): void {
+    const timer = this.#revertTimers.get(actionId);
+    if (timer) clearTimeout(timer);
+    this.#revertTimers.delete(actionId);
+  }
+
+  #revertToNumber(actionId: string, action: KeyAction<PeriodActionSettings>): void {
+    this.#clearRevertTimer(actionId);
+    this.#chartShowing.delete(actionId);
+    this.#redrawLast(actionId, action);
+  }
+
+  /** Redesenha o último modelo/estado conhecidos (podem ter mudado enquanto o gráfico estava em tela — ver `#applyIcon`), sem pulsar. */
+  #redrawLast(actionId: string, action: KeyAction<PeriodActionSettings>): void {
+    const model = this.#lastModel.get(actionId);
+    if (!model) {
+      iconAnimator.stop(actionId);
+      return;
+    }
+    const state = this.#lastState.get(actionId) ?? "ok";
+    this.#drawIcon(actionId, action, model, state, false, undefined);
   }
 
   /**
@@ -154,7 +219,10 @@ export abstract class PeriodMetricAction extends SingletonAction<PeriodActionSet
     this.#activeOrg.delete(actionId);
     this.#lastGoodOrgTotals.delete(actionId);
     this.#lastModel.delete(actionId); // muda o escopo (org liga/desliga) — valor anterior não é comparável
+    this.#lastState.delete(actionId);
     this.#lastPeriod.delete(actionId);
+    this.#clearRevertTimer(actionId);
+    this.#chartShowing.delete(actionId);
     // Cada período rastreado por essa tecla tem sua própria base — limpa todos.
     for (const period of Object.keys(PERIOD_LABEL) as Period[]) this.#celebration.forget(this.#celebrationKey(actionId, period));
   }
@@ -182,15 +250,34 @@ export abstract class PeriodMetricAction extends SingletonAction<PeriodActionSet
   }
 
   /**
-   * Decide entre pulso (valor mudou de verdade, mesmo período), respiração contínua
-   * (desatualizado/erro) ou ícone parado, e desenha. `allowPulse=false` quando só o período de
-   * visualização mudou — nesse caso o número quase sempre é diferente, mas isso não é uma
-   * atualização de dado, é navegação, então nunca deve pulsar.
+   * Guarda o modelo/estado mais recentes (sempre — mesmo com o gráfico em tela, pra reversão
+   * mostrar dado fresco) e decide se desenha agora. Enquanto o gráfico de barras estiver em tela
+   * (`#chartShowing`), nenhuma renderização de fundo (poll/tick) deve sobrescrevê-lo — `#drawIcon`
+   * só roda de novo quando o usuário clicar (`#revertToNumber`) ou o timer de reversão disparar.
    */
   #applyIcon(actionId: string, action: KeyAction<PeriodActionSettings>, model: MetricIconModel, state: IconState, allowPulse: boolean, period: Period): void {
     const previous = this.#lastModel.get(actionId);
     this.#lastModel.set(actionId, model);
+    this.#lastState.set(actionId, state);
+    if (this.#chartShowing.has(actionId)) return;
+    this.#drawIcon(actionId, action, model, state, allowPulse, period, previous);
+  }
 
+  /**
+   * Decide entre pulso (valor mudou de verdade, mesmo período), respiração contínua
+   * (desatualizado/erro) ou ícone parado, e desenha. `allowPulse=false` quando só o período de
+   * visualização mudou (ou ao voltar do gráfico de barras) — nesse caso o número quase sempre é
+   * diferente, mas isso não é uma atualização de dado, é navegação, então nunca deve pulsar.
+   */
+  #drawIcon(
+    actionId: string,
+    action: KeyAction<PeriodActionSettings>,
+    model: MetricIconModel,
+    state: IconState,
+    allowPulse: boolean,
+    period: Period | undefined,
+    previous?: MetricIconModel,
+  ): void {
     if (state === "error") {
       iconAnimator.breathe(actionId, action, (strength) => renderMetricIcon(model, { color: ACCENTS.red, strength }));
       return;
@@ -201,7 +288,7 @@ export abstract class PeriodMetricAction extends SingletonAction<PeriodActionSet
     }
     // `allowPulse` também é a guarda certa aqui: só considera comemorar numa atualização de dado
     // de verdade (mesmo período da última renderização), nunca numa troca de período de visualização.
-    if (allowPulse && this.celebrateIncrease() && this.#handleCelebration(actionId, period, action, model)) return;
+    if (allowPulse && period && this.celebrateIncrease() && this.#handleCelebration(actionId, period, action, model)) return;
     if (allowPulse && previous && previous.value !== model.value) {
       const accentColor = ACCENTS[this.accent()];
       iconAnimator.pulse(actionId, action, (strength) => renderMetricIcon(model, strength > 0.01 ? { color: accentColor, strength } : undefined));
