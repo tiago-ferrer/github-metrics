@@ -52,6 +52,11 @@ describe("runGh — classificação de erros", () => {
     await expect(runGh(["api", "user"])).rejects.toMatchObject({ kind: "network" });
   });
 
+  it("classifica como not-found quando a organização/repositório não existe", async () => {
+    mockGlobalSettings = { ghBinaryPath: fixture("gh-not-found.sh") };
+    await expect(runGh(["api", "graphql"])).rejects.toMatchObject({ kind: "not-found" });
+  });
+
   it("classifica como unknown quando não reconhece o padrão", async () => {
     mockGlobalSettings = { ghBinaryPath: fixture("gh-unknown-error.sh") };
     await expect(runGh(["api", "user"])).rejects.toMatchObject({ kind: "unknown" });

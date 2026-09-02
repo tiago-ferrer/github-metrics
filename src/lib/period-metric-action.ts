@@ -7,50 +7,98 @@ import streamDeck, {
   type WillDisappearEvent,
 } from "@elgato/streamdeck";
 import { reportError } from "./errors.js";
-import type { GhError } from "./gh.js";
-import type { MetricsSnapshot, PeriodTotals } from "./metrics.js";
+import { GhError } from "./gh.js";
+import { fetchOrgPeriodContributions, type MetricsSnapshot, type OrgPeriodContributions, type PeriodTotals } from "./metrics.js";
 import { metricsPoller } from "./poller.js";
-import { PERIOD_LABEL, resolvePeriod, type PeriodActionSettings } from "./settings.js";
+import { PERIOD_LABEL, refreshIntervalMs, resolvePeriod, type GlobalSettings, type PeriodActionSettings } from "./settings.js";
 
 /**
  * Base para actions com período configurável pelo Property Inspector (hoje/semana/mês/ano) —
- * usada por Commits e Reviews Feitas. Mesmo ciclo de vida da SimpleMetricAction, mas o valor
- * exibido depende também da settings da instância (lida via `action.getSettings()`).
+ * usada por Commits e Reviews Feitas. Mesmo ciclo de vida da SimpleMetricAction, incluindo o
+ * filtro opcional de organização (`settings.org`): vazio assina o poller central, preenchido
+ * usa timer + busca próprios (`fetchOrgPeriodContributions`, GraphQL escopada via
+ * `organizationID`). Trocar só o período, com a org já ativa, reaproveita o último resultado em
+ * vez de refazer a chamada de rede — os 4 períodos já vêm juntos numa única busca.
  */
 export abstract class PeriodMetricAction extends SingletonAction<PeriodActionSettings> {
   #unsubscribers = new Map<string, () => void>();
+  #timers = new Map<string, ReturnType<typeof setInterval>>();
+  #activeOrg = new Map<string, string | undefined>();
   #latest: { snapshot: MetricsSnapshot | null; error: GhError | null } = { snapshot: null, error: null };
+  #lastGoodOrgTotals = new Map<string, PeriodTotals>();
 
   protected abstract label(): string;
   protected abstract totals(snapshot: MetricsSnapshot): PeriodTotals;
+  /** Extrai commits ou reviews (conforme a action) do resultado escopado por organização. */
+  protected abstract orgTotals(contributions: OrgPeriodContributions): PeriodTotals;
   /** @param snapshot Último snapshot conhecido (pode ser usado para montar URLs com o username). */
   protected abstract url(snapshot: MetricsSnapshot | null): string;
+  /** URL ao clicar quando a tecla está escopada a uma organização (padrão: página da org). */
+  protected urlOrgScoped(org: string): string {
+    return `https://github.com/${org}`;
+  }
 
   override onWillAppear(ev: WillAppearEvent<PeriodActionSettings>): void {
     if (!ev.action.isKey()) return;
-    const action = ev.action;
-    const unsubscribe = metricsPoller.subscribe((snapshot, error) => {
-      this.#latest = { snapshot, error };
-      void this.#render(action);
-    });
-    this.#unsubscribers.set(action.id, unsubscribe);
+    void this.#activate(ev.action);
   }
 
   override onWillDisappear(ev: WillDisappearEvent<PeriodActionSettings>): void {
-    this.#unsubscribers.get(ev.action.id)?.();
-    this.#unsubscribers.delete(ev.action.id);
+    this.#deactivate(ev.action.id);
   }
 
   override onDidReceiveSettings(ev: DidReceiveSettingsEvent<PeriodActionSettings>): void {
-    if (ev.action.isKey()) void this.#render(ev.action);
+    if (ev.action.isKey()) void this.#activate(ev.action);
   }
 
   override async onKeyDown(ev: KeyDownEvent<PeriodActionSettings>): Promise<void> {
-    await streamDeck.system.openUrl(this.url(this.#latest.snapshot));
-    if (ev.action.isKey()) await ev.action.showOk();
+    if (!ev.action.isKey()) return;
+    const settings = await ev.action.getSettings();
+    const org = settings.org?.trim();
+    await streamDeck.system.openUrl(org ? this.urlOrgScoped(org) : this.url(this.#latest.snapshot));
+    await ev.action.showOk();
   }
 
-  async #render(action: KeyAction<PeriodActionSettings>): Promise<void> {
+  async #activate(action: KeyAction<PeriodActionSettings>): Promise<void> {
+    const settings = await action.getSettings();
+    const org = settings.org?.trim() || undefined;
+    const alreadyRunning = this.#unsubscribers.has(action.id) || this.#timers.has(action.id);
+    if (alreadyRunning && this.#activeOrg.get(action.id) === org) {
+      // só o período mudou (org é a mesma) — os 4 períodos já estão no cache, só re-renderiza
+      if (org) await this.#renderOrgScoped(action, org);
+      else void this.#renderShared(action);
+      return;
+    }
+
+    this.#deactivate(action.id);
+    this.#activeOrg.set(action.id, org);
+
+    if (!org) {
+      const unsubscribe = metricsPoller.subscribe((snapshot, error) => {
+        this.#latest = { snapshot, error };
+        void this.#renderShared(action);
+      });
+      this.#unsubscribers.set(action.id, unsubscribe);
+      return;
+    }
+
+    void this.#tickOrgScoped(action, org);
+    const globalSettings = await streamDeck.settings.getGlobalSettings<GlobalSettings>();
+    const timer = setInterval(() => void this.#tickOrgScoped(action, org), refreshIntervalMs(globalSettings));
+    this.#timers.set(action.id, timer);
+  }
+
+  #deactivate(actionId: string): void {
+    this.#unsubscribers.get(actionId)?.();
+    this.#unsubscribers.delete(actionId);
+    const timer = this.#timers.get(actionId);
+    if (timer) clearInterval(timer);
+    this.#timers.delete(actionId);
+    this.#activeOrg.delete(actionId);
+    this.#lastGoodOrgTotals.delete(actionId);
+  }
+
+  async #renderShared(action: KeyAction<PeriodActionSettings>): Promise<void> {
     const { snapshot, error } = this.#latest;
     if (!snapshot) {
       if (error) await reportError(action, error);
@@ -64,6 +112,38 @@ export abstract class PeriodMetricAction extends SingletonAction<PeriodActionSet
     if (error) {
       // Cache válido, mas última atualização falhou: mantém o número, marca "⚠" (PLANO.md §6).
       streamDeck.logger.warn(`Exibindo cache desatualizado para ${this.label()}: ${error.message}`);
+    }
+  }
+
+  async #renderOrgScoped(action: KeyAction<PeriodActionSettings>, org: string): Promise<void> {
+    const cached = this.#lastGoodOrgTotals.get(action.id);
+    if (!cached) {
+      await this.#tickOrgScoped(action, org);
+      return;
+    }
+    const settings = await action.getSettings();
+    const period = resolvePeriod(settings);
+    await action.setTitle(`${this.label()}\n${cached[period]}\n(${PERIOD_LABEL[period]} · ${org})`);
+  }
+
+  async #tickOrgScoped(action: KeyAction<PeriodActionSettings>, org: string): Promise<void> {
+    const settings = await action.getSettings();
+    const period = resolvePeriod(settings);
+    try {
+      const contributions = await fetchOrgPeriodContributions(org);
+      const totals = this.orgTotals(contributions);
+      this.#lastGoodOrgTotals.set(action.id, totals);
+      await action.setTitle(`${this.label()}\n${totals[period]}\n(${PERIOD_LABEL[period]} · ${org})`);
+    } catch (err) {
+      const cached = this.#lastGoodOrgTotals.get(action.id);
+      if (cached) {
+        await action.setTitle(`${this.label()}\n${cached[period]} ⚠\n(${PERIOD_LABEL[period]} · ${org})`);
+      } else {
+        await reportError(action, err);
+      }
+      streamDeck.logger.warn(
+        `Falha ao coletar ${this.label()} de ${org}: ${err instanceof GhError ? err.message : String(err)}`,
+      );
     }
   }
 }

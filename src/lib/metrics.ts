@@ -22,14 +22,48 @@ async function resolveUsername(settings: GlobalSettings): Promise<string> {
   return runGh(["api", "user", "--jq", ".login"]);
 }
 
-async function countSearch(args: string[]): Promise<number> {
-  const out = await runGh([...args, "--json", "number", "--jq", "length"]);
+/**
+ * `--limit=1000` (teto da própria API de busca do GitHub) evita subcontagem: o default do `gh`
+ * é 30 resultados, o que passa despercebido nas métricas pessoais mas é facilmente ultrapassado
+ * em contagens no nível de organização (ver `org-prs.ts`).
+ */
+export async function countSearch(args: string[]): Promise<number> {
+  const out = await runGh([...args, "--limit=1000", "--json", "number", "--jq", "length"]);
   return Number(out || 0);
 }
 
 async function fetchNotifications(): Promise<number> {
   const out = await runGh(["api", "notifications", "--jq", "length"]);
   return Number(out || 0);
+}
+
+/** PRs abertas por mim (`@me`), restritas aos repositórios de uma organização específica. */
+export async function fetchOrgScopedPrsOpen(org: string): Promise<number> {
+  return countSearch(["search", "prs", "--author=@me", "--state=open", `--owner=${org.trim()}`]);
+}
+
+/** PRs com minha review solicitada, restritas aos repositórios de uma organização específica. */
+export async function fetchOrgScopedReviewRequested(org: string): Promise<number> {
+  return countSearch(["search", "prs", "--review-requested=@me", "--state=open", `--owner=${org.trim()}`]);
+}
+
+/** Issues atribuídas a mim, restritas aos repositórios de uma organização específica. */
+export async function fetchOrgScopedIssuesAssigned(org: string): Promise<number> {
+  return countSearch(["search", "issues", "--assignee=@me", "--state=open", `--owner=${org.trim()}`]);
+}
+
+type NotificationLite = { repository?: { owner?: { login?: string } } };
+
+/**
+ * Notificações não lidas cujo repositório pertence a uma organização específica. A API de
+ * notificações não tem um filtro de owner/org nativo, então busca todas as páginas
+ * (`--paginate --slurp` — `--slurp` não pode ser combinado com `--jq`, ver nota em PLANO.md)
+ * e filtra no lado do cliente.
+ */
+export async function fetchOrgScopedNotifications(org: string): Promise<number> {
+  const trimmedOrg = org.trim();
+  const pages = await runGhJson<NotificationLite[][]>(["api", "notifications", "--paginate", "--slurp"]);
+  return pages.flat().filter((n) => n.repository?.owner?.login === trimmedOrg).length;
 }
 
 function isoStartOfTodayUtc(): string {
@@ -175,6 +209,91 @@ export async function fetchSnapshot(): Promise<MetricsSnapshot> {
     issuesAssigned,
     notifications,
     starsReceived,
+    commits: {
+      hoje: u.hoje.totalCommitContributions,
+      semana: u.semana.totalCommitContributions,
+      mes: u.mes.totalCommitContributions,
+      ano: u.ano.totalCommitContributions,
+    },
+    reviewsDone: {
+      hoje: u.hoje.totalPullRequestReviewContributions,
+      semana: u.semana.totalPullRequestReviewContributions,
+      mes: u.mes.totalPullRequestReviewContributions,
+      ano: u.ano.totalPullRequestReviewContributions,
+    },
+  };
+}
+
+/**
+ * `contributionsCollection` só aceita escopar por organização via `organizationID` (o node ID
+ * da org, não o login) — por isso a resolução do ID é uma chamada GraphQL separada, antes da
+ * query de contribuições em si. Se a org não existir, o próprio `gh` falha com stderr
+ * "Could not resolve to an Organization..." (classificado como `not-found` em gh.ts).
+ */
+async function resolveOrgId(org: string): Promise<string> {
+  const res = await graphql<{ data: { organization: { id: string } } }>(
+    `query($org: String!) { organization(login: $org) { id } }`,
+    { org },
+  );
+  return res.data.organization.id;
+}
+
+const ORG_CONTRIBUTIONS_QUERY = `
+query($login: String!, $orgId: ID!, $todayFrom: DateTime!, $weekFrom: DateTime!, $monthFrom: DateTime!, $now: DateTime!) {
+  user(login: $login) {
+    hoje: contributionsCollection(from: $todayFrom, to: $now, organizationID: $orgId) {
+      totalCommitContributions
+      totalPullRequestReviewContributions
+    }
+    semana: contributionsCollection(from: $weekFrom, to: $now, organizationID: $orgId) {
+      totalCommitContributions
+      totalPullRequestReviewContributions
+    }
+    mes: contributionsCollection(from: $monthFrom, to: $now, organizationID: $orgId) {
+      totalCommitContributions
+      totalPullRequestReviewContributions
+    }
+    ano: contributionsCollection(organizationID: $orgId) {
+      totalCommitContributions
+      totalPullRequestReviewContributions
+    }
+  }
+}`;
+
+type OrgContributionsResponse = {
+  data: {
+    user: {
+      hoje: ContributionWindow;
+      semana: ContributionWindow;
+      mes: ContributionWindow;
+      ano: ContributionWindow;
+    };
+  };
+};
+
+export type OrgPeriodContributions = {
+  commits: PeriodTotals;
+  reviewsDone: PeriodTotals;
+};
+
+/** Commits e reviews feitas por mim (`@me`), restritos a uma organização específica — usado por Commits e Reviews Feitas quando a tecla tem "Organização" configurada. */
+export async function fetchOrgPeriodContributions(org: string): Promise<OrgPeriodContributions> {
+  const settings = await streamDeck.settings.getGlobalSettings<GlobalSettings>();
+  const username = await resolveUsername(settings);
+  const orgId = await resolveOrgId(org.trim());
+  const now = new Date().toISOString();
+
+  const res = await graphql<OrgContributionsResponse>(ORG_CONTRIBUTIONS_QUERY, {
+    login: username,
+    orgId,
+    todayFrom: isoStartOfTodayUtc(),
+    weekFrom: isoDaysAgo(7),
+    monthFrom: isoDaysAgo(30),
+    now,
+  });
+
+  const u = res.data.user;
+  return {
     commits: {
       hoje: u.hoje.totalCommitContributions,
       semana: u.semana.totalCommitContributions,

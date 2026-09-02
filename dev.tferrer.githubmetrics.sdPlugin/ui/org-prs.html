@@ -1,0 +1,46 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="pi-common.css" />
+  </head>
+  <body>
+    <h1>Organização</h1>
+    <div class="field">
+      <label for="org">Organização</label>
+      <input id="org" type="text" placeholder="ex.: github" data-setting="org" />
+    </div>
+    <div class="field">
+      <label for="repo">Repositório</label>
+      <input id="repo" type="text" placeholder="opcional — toda a org" data-setting="repo" />
+    </div>
+    <p class="hint">
+      Informe o login da organização (o nome que aparece em <code>github.com/&lt;org&gt;</code>).
+      Deixe "Repositório" em branco para somar as PRs abertas de todos os repositórios da
+      organização, ou preencha para ver apenas as de um repositório específico (ex.: <code>cli</code>
+      para <code>github.com/cli/cli</code>).
+    </p>
+
+    <h1>Avançado</h1>
+    <div class="field">
+      <label for="ghBinaryPath">Caminho do gh</label>
+      <input id="ghBinaryPath" type="text" placeholder="gh" data-global-setting="ghBinaryPath" />
+    </div>
+    <p class="hint">No Windows, se informar um caminho completo, inclua a extensão <code>.exe</code>.</p>
+    <div class="field">
+      <label for="refreshIntervalSeconds">Refresh (segundos)</label>
+      <input
+        id="refreshIntervalSeconds"
+        type="number"
+        min="30"
+        step="10"
+        placeholder="60"
+        data-global-setting="refreshIntervalSeconds"
+        data-type="number"
+      />
+    </div>
+    <p class="hint">Caminho do gh e refresh são globais (valem para todas as actions); organização e repositório são desta tecla.</p>
+
+    <script src="pi-common.js"></script>
+  </body>
+</html>

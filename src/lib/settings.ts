@@ -26,10 +26,29 @@ export const PERIOD_LABEL: Record<Period, string> = {
   ano: "ano",
 };
 
-export type PeriodActionSettings = {
+/**
+ * Settings comuns a qualquer action pessoal que aceite escopar sua métrica a uma organização
+ * específica (ex.: "minhas PRs abertas, mas só as da org X"). `org` vazio/ausente mantém o
+ * comportamento padrão (conta pessoal inteira, via poller central).
+ */
+export type OrgFilterSettings = {
+  org?: string;
+};
+
+export type PeriodActionSettings = OrgFilterSettings & {
   period?: Period;
 };
 
 export function resolvePeriod(settings: PeriodActionSettings): Period {
   return settings.period ?? "hoje";
 }
+
+/**
+ * Settings da action "PRs Abertas (Org)". `org` é obrigatório (login da organização); `repo`
+ * é opcional — se vazio, agrega PRs de todos os repositórios da org, se preenchido, escopa
+ * para um repositório específico dela (feature de organização, distinta das actions pessoais).
+ */
+export type OrgActionSettings = {
+  org?: string;
+  repo?: string;
+};

@@ -9,6 +9,7 @@ describe("errorLabel", () => {
     ["not-authenticated", "gh sem\nlogin"],
     ["rate-limited", "Rate\nlimit"],
     ["network", "Sem\nconexão"],
+    ["not-found", "Org/repo\ninexistente"],
     ["unknown", "Erro"],
   ];
 

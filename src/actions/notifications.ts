@@ -1,6 +1,6 @@
 import { action } from "@elgato/streamdeck";
 import { SimpleMetricAction } from "../lib/simple-metric-action.js";
-import type { MetricsSnapshot } from "../lib/metrics.js";
+import { fetchOrgScopedNotifications, type MetricsSnapshot } from "../lib/metrics.js";
 
 @action({ UUID: "dev.tferrer.githubmetrics.notifications" })
 export class NotificationsAction extends SimpleMetricAction {
@@ -14,5 +14,9 @@ export class NotificationsAction extends SimpleMetricAction {
 
   protected url(): string {
     return "https://github.com/notifications";
+  }
+
+  protected override fetchOrgScoped(org: string): Promise<number> {
+    return fetchOrgScopedNotifications(org);
   }
 }

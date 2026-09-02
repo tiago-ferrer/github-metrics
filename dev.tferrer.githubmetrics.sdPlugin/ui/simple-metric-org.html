@@ -7,21 +7,12 @@
   <body>
     <h1>Esta action</h1>
     <div class="field">
-      <label for="period">Período</label>
-      <select id="period" data-setting="period">
-        <option value="hoje">Hoje</option>
-        <option value="semana">Última semana</option>
-        <option value="mes">Último mês</option>
-        <option value="ano">Último ano</option>
-      </select>
-    </div>
-    <div class="field">
       <label for="org">Organização</label>
       <input id="org" type="text" placeholder="opcional — toda a conta" data-setting="org" />
     </div>
     <p class="hint">
-      Deixe "Organização" em branco para contar em toda a sua conta GitHub. Preencha com o login
-      de uma organização (ex.: <code>github</code>) para restringir esta tecla só aos commits/reviews feitos nela.
+      Deixe em branco para contar em toda a sua conta GitHub. Preencha com o login de uma
+      organização (ex.: <code>github</code>) para restringir esta tecla só aos repositórios dela.
     </p>
 
     <h1>Conta GitHub</h1>
@@ -48,7 +39,7 @@
         data-type="number"
       />
     </div>
-    <p class="hint">Usuário, caminho do gh e refresh são globais (valem para todas as actions).</p>
+    <p class="hint">Usuário, caminho do gh e refresh são globais (valem para todas as actions); organização é desta tecla.</p>
 
     <script src="pi-common.js"></script>
   </body>

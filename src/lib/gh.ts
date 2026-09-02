@@ -9,7 +9,7 @@ const execFileAsync = promisify(execFile);
  * Categorias de falha ao chamar o `gh`, usadas para decidir o que mostrar na action
  * (ver PLANO.md §6 — Tratamento de erros).
  */
-export type GhErrorKind = "not-installed" | "not-authenticated" | "rate-limited" | "network" | "unknown";
+export type GhErrorKind = "not-installed" | "not-authenticated" | "rate-limited" | "network" | "not-found" | "unknown";
 
 export class GhError extends Error {
   readonly kind: GhErrorKind;
@@ -55,6 +55,9 @@ function classifyError(err: unknown): GhError {
   }
   if (/rate limit/i.test(stderr)) {
     return new GhError("Rate limit da API do GitHub excedido.", "rate-limited", err);
+  }
+  if (/could not resolve to a[n]? (organization|repository|user|project)/i.test(stderr)) {
+    return new GhError("Organização ou repositório não encontrado.", "not-found", err);
   }
   if (/could not resolve host|network is unreachable|timed? ?out/i.test(stderr) || nodeErr?.killed) {
     return new GhError("Sem conexão com a internet ou GitHub indisponível.", "network", err);

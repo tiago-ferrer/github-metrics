@@ -32,9 +32,9 @@
     {
       "UUID": "dev.tferrer.githubmetrics.prs-open",
       "Name": "PRs Abertas",
-      "Tooltip": "Quantidade de Pull Requests abertas por você",
+      "Tooltip": "Quantidade de Pull Requests abertas por você (opcionalmente restrita a uma organização)",
       "Icon": "imgs/actions/prs-open/icon",
-      "PropertyInspectorPath": "ui/simple-metric.html",
+      "PropertyInspectorPath": "ui/simple-metric-org.html",
       "Controllers": [
         "Keypad"
       ],
@@ -49,9 +49,9 @@
     {
       "UUID": "dev.tferrer.githubmetrics.review-requested",
       "Name": "Review Solicitada",
-      "Tooltip": "PRs aguardando sua review",
+      "Tooltip": "PRs aguardando sua review (opcionalmente restrita a uma organização)",
       "Icon": "imgs/actions/review-requested/icon",
-      "PropertyInspectorPath": "ui/simple-metric.html",
+      "PropertyInspectorPath": "ui/simple-metric-org.html",
       "Controllers": [
         "Keypad"
       ],
@@ -66,9 +66,9 @@
     {
       "UUID": "dev.tferrer.githubmetrics.issues-assigned",
       "Name": "Issues Atribuídas",
-      "Tooltip": "Issues abertas atribuídas a você",
+      "Tooltip": "Issues abertas atribuídas a você (opcionalmente restrita a uma organização)",
       "Icon": "imgs/actions/issues-assigned/icon",
-      "PropertyInspectorPath": "ui/simple-metric.html",
+      "PropertyInspectorPath": "ui/simple-metric-org.html",
       "Controllers": [
         "Keypad"
       ],
@@ -83,9 +83,9 @@
     {
       "UUID": "dev.tferrer.githubmetrics.notifications",
       "Name": "Notificações",
-      "Tooltip": "Notificações não lidas",
+      "Tooltip": "Notificações não lidas (opcionalmente restrita a uma organização)",
       "Icon": "imgs/actions/notifications/icon",
-      "PropertyInspectorPath": "ui/simple-metric.html",
+      "PropertyInspectorPath": "ui/simple-metric-org.html",
       "Controllers": [
         "Keypad"
       ],
@@ -100,7 +100,7 @@
     {
       "UUID": "dev.tferrer.githubmetrics.commits",
       "Name": "Commits",
-      "Tooltip": "Commits contribuídos no período selecionado",
+      "Tooltip": "Commits contribuídos no período selecionado (opcionalmente restrito a uma organização)",
       "Icon": "imgs/actions/commits/icon",
       "PropertyInspectorPath": "ui/period-metric.html",
       "Controllers": [
@@ -117,7 +117,7 @@
     {
       "UUID": "dev.tferrer.githubmetrics.reviews-done",
       "Name": "Reviews Feitas",
-      "Tooltip": "Reviews de PR realizadas no período selecionado",
+      "Tooltip": "Reviews de PR realizadas no período selecionado (opcionalmente restrito a uma organização)",
       "Icon": "imgs/actions/reviews-done/icon",
       "PropertyInspectorPath": "ui/period-metric.html",
       "Controllers": [
@@ -145,6 +145,23 @@
           "Image": "imgs/actions/stars-received/icon",
           "TitleAlignment": "bottom",
           "FontSize": 16
+        }
+      ]
+    },
+    {
+      "UUID": "dev.tferrer.githubmetrics.org-prs-open",
+      "Name": "PRs Abertas (Org)",
+      "Tooltip": "PRs abertas em uma organização inteira, ou em um repositório específico dela",
+      "Icon": "imgs/actions/org-prs-open/icon",
+      "PropertyInspectorPath": "ui/org-prs.html",
+      "Controllers": [
+        "Keypad"
+      ],
+      "States": [
+        {
+          "Image": "imgs/actions/org-prs-open/icon",
+          "TitleAlignment": "bottom",
+          "FontSize": 14
         }
       ]
     },

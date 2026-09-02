@@ -1,6 +1,6 @@
 import { action } from "@elgato/streamdeck";
 import { SimpleMetricAction } from "../lib/simple-metric-action.js";
-import type { MetricsSnapshot } from "../lib/metrics.js";
+import { fetchOrgScopedPrsOpen, type MetricsSnapshot } from "../lib/metrics.js";
 
 @action({ UUID: "dev.tferrer.githubmetrics.prs-open" })
 export class PrsOpenAction extends SimpleMetricAction {
@@ -14,5 +14,9 @@ export class PrsOpenAction extends SimpleMetricAction {
 
   protected url(): string {
     return "https://github.com/pulls";
+  }
+
+  protected override fetchOrgScoped(org: string): Promise<number> {
+    return fetchOrgScopedPrsOpen(org);
   }
 }

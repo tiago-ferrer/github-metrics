@@ -1,6 +1,6 @@
 import { action } from "@elgato/streamdeck";
 import { PeriodMetricAction } from "../lib/period-metric-action.js";
-import type { MetricsSnapshot, PeriodTotals } from "../lib/metrics.js";
+import type { MetricsSnapshot, OrgPeriodContributions, PeriodTotals } from "../lib/metrics.js";
 
 @action({ UUID: "dev.tferrer.githubmetrics.reviews-done" })
 export class ReviewsDoneAction extends PeriodMetricAction {
@@ -10,6 +10,10 @@ export class ReviewsDoneAction extends PeriodMetricAction {
 
   protected totals(snapshot: MetricsSnapshot): PeriodTotals {
     return snapshot.reviewsDone;
+  }
+
+  protected orgTotals(contributions: OrgPeriodContributions): PeriodTotals {
+    return contributions.reviewsDone;
   }
 
   protected url(snapshot: MetricsSnapshot | null): string {
