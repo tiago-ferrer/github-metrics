@@ -40,9 +40,7 @@
       ],
       "States": [
         {
-          "Image": "imgs/actions/prs-open/icon",
-          "TitleAlignment": "bottom",
-          "FontSize": 16
+          "Image": "imgs/actions/prs-open/icon"
         }
       ]
     },
@@ -57,9 +55,7 @@
       ],
       "States": [
         {
-          "Image": "imgs/actions/review-requested/icon",
-          "TitleAlignment": "bottom",
-          "FontSize": 16
+          "Image": "imgs/actions/review-requested/icon"
         }
       ]
     },
@@ -74,9 +70,7 @@
       ],
       "States": [
         {
-          "Image": "imgs/actions/issues-assigned/icon",
-          "TitleAlignment": "bottom",
-          "FontSize": 16
+          "Image": "imgs/actions/issues-assigned/icon"
         }
       ]
     },
@@ -91,9 +85,7 @@
       ],
       "States": [
         {
-          "Image": "imgs/actions/notifications/icon",
-          "TitleAlignment": "bottom",
-          "FontSize": 16
+          "Image": "imgs/actions/notifications/icon"
         }
       ]
     },
@@ -108,9 +100,7 @@
       ],
       "States": [
         {
-          "Image": "imgs/actions/commits/icon",
-          "TitleAlignment": "bottom",
-          "FontSize": 14
+          "Image": "imgs/actions/commits/icon"
         }
       ]
     },
@@ -125,9 +115,7 @@
       ],
       "States": [
         {
-          "Image": "imgs/actions/reviews-done/icon",
-          "TitleAlignment": "bottom",
-          "FontSize": 14
+          "Image": "imgs/actions/reviews-done/icon"
         }
       ]
     },
@@ -142,9 +130,7 @@
       ],
       "States": [
         {
-          "Image": "imgs/actions/stars-received/icon",
-          "TitleAlignment": "bottom",
-          "FontSize": 16
+          "Image": "imgs/actions/stars-received/icon"
         }
       ]
     },
@@ -159,9 +145,7 @@
       ],
       "States": [
         {
-          "Image": "imgs/actions/org-prs-open/icon",
-          "TitleAlignment": "bottom",
-          "FontSize": 14
+          "Image": "imgs/actions/org-prs-open/icon"
         }
       ]
     },
@@ -177,13 +161,11 @@
       "States": [
         {
           "Image": "imgs/actions/status/ok",
-          "Name": "OK",
-          "TitleAlignment": "bottom"
+          "Name": "OK"
         },
         {
           "Image": "imgs/actions/status/error",
-          "Name": "Erro",
-          "TitleAlignment": "bottom"
+          "Name": "Erro"
         }
       ]
     }

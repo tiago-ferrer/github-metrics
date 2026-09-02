@@ -6,34 +6,48 @@ import streamDeck, {
   type WillAppearEvent,
   type WillDisappearEvent,
 } from "@elgato/streamdeck";
-import { reportError } from "./errors.js";
+import { errorLabel } from "./errors.js";
 import { GhError } from "./gh.js";
+import { iconAnimator, safeSetImage } from "./icon-animator.js";
+import { renderMetricIcon, type MetricIconModel } from "./icon-render.js";
+import type { GlyphId } from "./glyphs.js";
 import type { MetricsSnapshot } from "./metrics.js";
 import { metricsPoller } from "./poller.js";
 import { refreshIntervalMs, type GlobalSettings, type OrgFilterSettings } from "./settings.js";
+import { ACCENTS, type AccentKey } from "./theme.js";
+
+type IconState = "ok" | "stale" | "error";
 
 /**
- * Base comum para actions que exibem um único número extraído do snapshot de métricas,
- * e que ao serem pressionadas abrem uma URL no GitHub. Cobre o ciclo de vida completo:
- * inscreve no poller central em onWillAppear, desinscreve em onWillDisappear (PLANO.md §3).
+ * Base comum para actions que exibem um único número extraído do snapshot de métricas. O
+ * ícone é desenhado dinamicamente via `setImage` (não mais `setTitle`): chip com o pictograma,
+ * número grande e, quando o valor muda, um pulso de destaque na cor da métrica (ver
+ * `icon-render.ts`/`icon-animator.ts`). Dado desatualizado (cache válido, última busca falhou)
+ * "respira" em âmbar continuamente; sem nenhum valor, respira em vermelho com o rótulo do erro.
  *
- * Suporta opcionalmente um filtro de organização por tecla (`settings.org`, ver PI
- * `simple-metric-org.html`): quando vazio, a tecla assina o poller central (comportamento
- * original, sem custo extra de API); quando preenchido, a tecla passa a ter seu próprio timer
- * e busca (`fetchOrgScoped`), já que orgs diferentes por tecla não podem compartilhar um único
- * cache. Actions sem esse campo no PI (ex.: Estrelas Recebidas) nunca saem do primeiro modo.
+ * Cobre o ciclo de vida completo: inscreve no poller central em onWillAppear, desinscreve em
+ * onWillDisappear (PLANO.md §3). Suporta opcionalmente um filtro de organização por tecla
+ * (`settings.org`, ver PI `simple-metric-org.html`): vazio assina o poller central (comportamento
+ * original, sem custo extra de API); preenchido usa timer e busca próprios (`fetchOrgScoped`), já
+ * que orgs diferentes por tecla não podem compartilhar um único cache. Actions sem esse campo no
+ * PI (ex.: Estrelas Recebidas) nunca saem do primeiro modo.
  */
 export abstract class SimpleMetricAction<TSettings extends OrgFilterSettings = OrgFilterSettings> extends SingletonAction<TSettings> {
   #unsubscribers = new Map<string, () => void>();
   #timers = new Map<string, ReturnType<typeof setInterval>>();
   #activeOrg = new Map<string, string | undefined>();
   #lastGoodOrgValue = new Map<string, number>();
+  #lastModel = new Map<string, MetricIconModel>();
   #latestSnapshot: MetricsSnapshot | null = null;
   #activationChain = new Map<string, Promise<void>>();
   #tickInFlight = new Set<string>();
 
-  /** Rótulo curto exibido acima do número (ex.: "PRs"). */
+  /** Rótulo curto abaixo do número (ex.: "PRs"). */
   protected abstract label(): string;
+  /** Pictograma exibido no chip do ícone. */
+  protected abstract glyphId(): GlyphId;
+  /** Cor de destaque desta métrica (chip e pulso ao mudar de valor). */
+  protected abstract accent(): AccentKey;
   /** Extrai o valor a exibir a partir do snapshot mais recente (modo pessoal, sem org). */
   protected abstract value(snapshot: MetricsSnapshot): number;
   /** URL aberta no navegador ao pressionar a tecla (modo pessoal, sem org). */
@@ -62,6 +76,7 @@ export abstract class SimpleMetricAction<TSettings extends OrgFilterSettings = O
     this.#deactivate(ev.action.id);
     this.#activationChain.delete(ev.action.id);
     this.#tickInFlight.delete(ev.action.id);
+    iconAnimator.stop(ev.action.id);
   }
 
   override onDidReceiveSettings(ev: DidReceiveSettingsEvent<TSettings>): void {
@@ -73,7 +88,13 @@ export abstract class SimpleMetricAction<TSettings extends OrgFilterSettings = O
     const settings = await ev.action.getSettings();
     const org = settings.org?.trim();
     await streamDeck.system.openUrl(org ? this.urlOrgScoped(org) : this.url(this.#latestSnapshot));
-    await ev.action.showOk();
+    // Confirmação tátil: um flash breve e neutro sobre o ícone atual, no lugar do showOk() padrão.
+    const model = this.#lastModel.get(ev.action.id);
+    if (model) {
+      iconAnimator.pulse(ev.action.id, ev.action, (strength) =>
+        renderMetricIcon(model, strength > 0.01 ? { color: "#FFFFFF", strength: strength * 0.55 } : undefined),
+      );
+    }
   }
 
   /**
@@ -125,19 +146,51 @@ export abstract class SimpleMetricAction<TSettings extends OrgFilterSettings = O
     this.#timers.delete(actionId);
     this.#activeOrg.delete(actionId);
     this.#lastGoodOrgValue.delete(actionId);
+    this.#lastModel.delete(actionId); // muda o escopo (org liga/desliga) — valor anterior não é comparável
+  }
+
+  /** Decide entre pulso (valor mudou), respiração contínua (desatualizado/erro) ou ícone parado, e desenha. */
+  #applyIcon(actionId: string, action: KeyAction<TSettings>, model: MetricIconModel, state: IconState): void {
+    const previous = this.#lastModel.get(actionId);
+    this.#lastModel.set(actionId, model);
+
+    if (state === "error") {
+      iconAnimator.breathe(actionId, action, (strength) => renderMetricIcon(model, { color: ACCENTS.red, strength }));
+      return;
+    }
+    if (state === "stale") {
+      iconAnimator.breathe(actionId, action, (strength) => renderMetricIcon(model, { color: ACCENTS.amber, strength }));
+      return;
+    }
+    if (previous && previous.value !== model.value) {
+      const accentColor = ACCENTS[this.accent()];
+      iconAnimator.pulse(actionId, action, (strength) => renderMetricIcon(model, strength > 0.01 ? { color: accentColor, strength } : undefined));
+      return;
+    }
+    iconAnimator.stop(actionId);
+    safeSetImage(action, renderMetricIcon(model));
   }
 
   async #renderShared(action: KeyAction<TSettings>, snapshot: MetricsSnapshot | null, error: GhError | null): Promise<void> {
     if (snapshot) this.#latestSnapshot = snapshot;
     if (!snapshot) {
-      if (error) await reportError(action, error);
+      if (error) {
+        const model: MetricIconModel = { glyphId: this.glyphId(), accent: this.accent(), label: this.label(), value: null, statusText: errorLabel(error) };
+        this.#applyIcon(action.id, action, model, "error");
+      }
       return;
     }
-    const staleMark = error ? " ⚠" : "";
-    await action.setTitle(`${this.label()}\n${this.value(snapshot)}${staleMark}`);
+    const model: MetricIconModel = {
+      glyphId: this.glyphId(),
+      accent: this.accent(),
+      label: this.label(),
+      value: this.value(snapshot),
+      scopeLabel: error ? "desatualizado" : undefined,
+    };
+    this.#applyIcon(action.id, action, model, error ? "stale" : "ok");
     if (error) {
-      // Tem cache válido, mas a última atualização falhou: mantém o número, marca "⚠" no título
-      // (indicador visual de desatualizado, PLANO.md §6) e loga para diagnóstico.
+      // Tem cache válido, mas a última atualização falhou: mantém o número, respira em âmbar
+      // (PLANO.md §6) e loga para diagnóstico.
       streamDeck.logger.warn(`Exibindo cache desatualizado para ${this.label()}: ${error.message}`);
     }
   }
@@ -159,13 +212,16 @@ export abstract class SimpleMetricAction<TSettings extends OrgFilterSettings = O
     try {
       const value = await this.fetchOrgScoped(org);
       this.#lastGoodOrgValue.set(action.id, value);
-      await action.setTitle(`${this.label()}\n${value}\n(${org})`);
+      const model: MetricIconModel = { glyphId: this.glyphId(), accent: this.accent(), label: this.label(), value, scopeLabel: org };
+      this.#applyIcon(action.id, action, model, "ok");
     } catch (err) {
       const cached = this.#lastGoodOrgValue.get(action.id);
       if (cached !== undefined) {
-        await action.setTitle(`${this.label()}\n${cached} ⚠\n(${org})`);
+        const model: MetricIconModel = { glyphId: this.glyphId(), accent: this.accent(), label: this.label(), value: cached, scopeLabel: org };
+        this.#applyIcon(action.id, action, model, "stale");
       } else {
-        await reportError(action, err);
+        const model: MetricIconModel = { glyphId: this.glyphId(), accent: this.accent(), label: this.label(), value: null, statusText: errorLabel(err) };
+        this.#applyIcon(action.id, action, model, "error");
       }
       streamDeck.logger.warn(
         `Falha ao coletar ${this.label()} de ${org}: ${err instanceof GhError ? err.message : String(err)}`,

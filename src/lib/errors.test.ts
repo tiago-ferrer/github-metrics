@@ -1,6 +1,5 @@
-import { describe, expect, it, vi } from "vitest";
-import type { KeyAction } from "@elgato/streamdeck";
-import { errorLabel, reportError } from "./errors.js";
+import { describe, expect, it } from "vitest";
+import { errorLabel } from "./errors.js";
 import { GhError, type GhErrorKind } from "./gh.js";
 
 describe("errorLabel", () => {
@@ -19,14 +18,5 @@ describe("errorLabel", () => {
 
   it("erros que não são GhError caem no rótulo genérico", () => {
     expect(errorLabel(new Error("boom"))).toBe("Erro");
-  });
-});
-
-describe("reportError", () => {
-  it("seta o título com o rótulo do erro e dispara showAlert", async () => {
-    const action = { setTitle: vi.fn(), showAlert: vi.fn() } as unknown as KeyAction;
-    await reportError(action, new GhError("msg", "rate-limited"));
-    expect(action.setTitle).toHaveBeenCalledWith("Rate\nlimit");
-    expect(action.showAlert).toHaveBeenCalledTimes(1);
   });
 });

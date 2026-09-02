@@ -7,24 +7,28 @@ import streamDeck, {
   type WillAppearEvent,
   type WillDisappearEvent,
 } from "@elgato/streamdeck";
-import { reportError } from "../lib/errors.js";
+import { errorLabel } from "../lib/errors.js";
 import { GhError } from "../lib/gh.js";
+import { iconAnimator, safeSetImage } from "../lib/icon-animator.js";
+import { renderMetricIcon, type MetricIconModel } from "../lib/icon-render.js";
 import { fetchOrgOpenPrCount } from "../lib/org-prs.js";
 import { refreshIntervalMs, type GlobalSettings, type OrgActionSettings } from "../lib/settings.js";
-
-type LastGood = { count: number; scopeLabel: string };
+import { ACCENTS } from "../lib/theme.js";
 
 /**
  * PRs abertas escopadas a uma organização (todos os repos) ou, se `repo` for informado nas
  * settings da tecla, a um único repositório dela. Cada tecla configura sua própria org/repo
  * (settings por instância, como o período de Commits/Reviews) — por isso não usa o poller
  * central (que só cobre a conta pessoal do usuário), tem timer próprio como `status.ts`.
- * Em erro, mantém o último valor válido com marca "⚠" em vez de zerar (PLANO.md §6).
+ * Ícone dinâmico via `setImage`: pulsa na cor da métrica quando o número muda, respira em
+ * âmbar mostrando o último valor válido se a busca mais recente falhar (PLANO.md §6), ou em
+ * vermelho com o rótulo do erro se não houver nenhum valor em cache ainda.
  */
 @action({ UUID: "dev.tferrer.githubmetrics.org-prs-open" })
 export class OrgPrsOpenAction extends SingletonAction<OrgActionSettings> {
   #timers = new Map<string, ReturnType<typeof setInterval>>();
-  #lastGood = new Map<string, LastGood>();
+  #lastGood = new Map<string, number>();
+  #lastModel = new Map<string, MetricIconModel>();
   #inFlight = new Set<string>();
 
   override onWillAppear(ev: WillAppearEvent<OrgActionSettings>): void {
@@ -41,6 +45,8 @@ export class OrgPrsOpenAction extends SingletonAction<OrgActionSettings> {
   override onWillDisappear(ev: WillDisappearEvent<OrgActionSettings>): void {
     this.#clearTimer(ev.action.id);
     this.#lastGood.delete(ev.action.id);
+    this.#lastModel.delete(ev.action.id);
+    iconAnimator.stop(ev.action.id);
   }
 
   #clearTimer(actionId: string): void {
@@ -57,7 +63,12 @@ export class OrgPrsOpenAction extends SingletonAction<OrgActionSettings> {
     if (!ev.action.isKey()) return;
     const settings = await ev.action.getSettings();
     await streamDeck.system.openUrl(this.#url(settings));
-    await ev.action.showOk();
+    const model = this.#lastModel.get(ev.action.id);
+    if (model) {
+      iconAnimator.pulse(ev.action.id, ev.action, (strength) =>
+        renderMetricIcon(model, strength > 0.01 ? { color: "#FFFFFF", strength: strength * 0.55 } : undefined),
+      );
+    }
   }
 
   async #startTimer(action: KeyAction<OrgActionSettings>): Promise<void> {
@@ -72,6 +83,27 @@ export class OrgPrsOpenAction extends SingletonAction<OrgActionSettings> {
     if (!org) return "https://github.com";
     if (repo) return `https://github.com/${org}/${repo}/pulls`;
     return `https://github.com/search?q=${encodeURIComponent(`is:pr is:open org:${org}`)}&type=pullrequests`;
+  }
+
+  /** Pulsa (valor mudou), respira (desatualizado/erro) ou para o ícone, conforme o estado. */
+  #applyIcon(actionId: string, action: KeyAction<OrgActionSettings>, model: MetricIconModel, state: "ok" | "stale" | "error"): void {
+    const previous = this.#lastModel.get(actionId);
+    this.#lastModel.set(actionId, model);
+
+    if (state === "error") {
+      iconAnimator.breathe(actionId, action, (strength) => renderMetricIcon(model, { color: ACCENTS.red, strength }));
+      return;
+    }
+    if (state === "stale") {
+      iconAnimator.breathe(actionId, action, (strength) => renderMetricIcon(model, { color: ACCENTS.amber, strength }));
+      return;
+    }
+    if (previous && previous.value !== model.value) {
+      iconAnimator.pulse(actionId, action, (strength) => renderMetricIcon(model, strength > 0.01 ? { color: ACCENTS.blue, strength } : undefined));
+      return;
+    }
+    iconAnimator.stop(actionId);
+    safeSetImage(action, renderMetricIcon(model));
   }
 
   async #tick(action: KeyAction<OrgActionSettings>): Promise<void> {
@@ -91,21 +123,25 @@ export class OrgPrsOpenAction extends SingletonAction<OrgActionSettings> {
     const settings = await action.getSettings();
     const org = settings.org?.trim();
     if (!org) {
-      await action.setTitle("Config.\norg");
+      const model: MetricIconModel = { glyphId: "org-prs-open", accent: "blue", label: "PRs", value: null, statusText: "Config.\norg" };
+      this.#applyIcon(action.id, action, model, "error");
       return;
     }
     const repo = settings.repo?.trim();
     const scopeLabel = repo || org;
     try {
       const count = await fetchOrgOpenPrCount(org, repo);
-      this.#lastGood.set(action.id, { count, scopeLabel });
-      await action.setTitle(`PRs\n${count}\n(${scopeLabel})`);
+      this.#lastGood.set(action.id, count);
+      const model: MetricIconModel = { glyphId: "org-prs-open", accent: "blue", label: "PRs", value: count, scopeLabel };
+      this.#applyIcon(action.id, action, model, "ok");
     } catch (err) {
       const cached = this.#lastGood.get(action.id);
-      if (cached) {
-        await action.setTitle(`PRs\n${cached.count} ⚠\n(${cached.scopeLabel})`);
+      if (cached !== undefined) {
+        const model: MetricIconModel = { glyphId: "org-prs-open", accent: "blue", label: "PRs", value: cached, scopeLabel: `${scopeLabel} · desatualizado` };
+        this.#applyIcon(action.id, action, model, "stale");
       } else {
-        await reportError(action, err);
+        const model: MetricIconModel = { glyphId: "org-prs-open", accent: "blue", label: "PRs", value: null, statusText: errorLabel(err) };
+        this.#applyIcon(action.id, action, model, "error");
       }
       streamDeck.logger.warn(
         `Falha ao coletar PRs de ${scopeLabel}: ${err instanceof GhError ? err.message : String(err)}`,
