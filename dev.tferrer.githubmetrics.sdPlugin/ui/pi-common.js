@@ -5,7 +5,10 @@
  *
  * Uso: elementos com `data-setting="chave"` são lidos/gravados nas settings da action instance;
  * elementos com `data-global-setting="chave"` são lidos/gravados nas Global Settings do plugin.
- * `data-type="number"` converte o valor para Number antes de salvar.
+ * `data-type="number"` converte o valor para Number antes de salvar. `data-type="minutes"` é
+ * como "number", mas o campo mostra/recebe minutos enquanto o valor gravado continua em
+ * segundos (ex.: refreshIntervalSeconds) — só a exibição muda, a settings guardada é a mesma
+ * de sempre, então configurações já salvas por versões antigas do plugin continuam valendo.
  */
 (function () {
   let websocket = null;
@@ -15,18 +18,26 @@
   let ready = false;
   const readyCallbacks = [];
 
+  // Valor exibido no campo → valor gravado na settings.
   function coerce(el, rawValue) {
-    return el.dataset.type === "number" ? Number(rawValue) : rawValue;
+    if (el.dataset.type === "minutes") return Math.round(Number(rawValue) * 60);
+    if (el.dataset.type === "number") return Number(rawValue);
+    return rawValue;
+  }
+
+  // Valor gravado na settings → valor exibido no campo (inverso de coerce).
+  function displayValue(el, storedValue) {
+    return el.dataset.type === "minutes" ? storedValue / 60 : storedValue;
   }
 
   function applyValues() {
     document.querySelectorAll("[data-setting]").forEach((el) => {
       const key = el.dataset.setting;
-      if (key in currentSettings && currentSettings[key] !== undefined) el.value = currentSettings[key];
+      if (key in currentSettings && currentSettings[key] !== undefined) el.value = displayValue(el, currentSettings[key]);
     });
     document.querySelectorAll("[data-global-setting]").forEach((el) => {
       const key = el.dataset.globalSetting;
-      if (key in currentGlobalSettings && currentGlobalSettings[key] !== undefined) el.value = currentGlobalSettings[key];
+      if (key in currentGlobalSettings && currentGlobalSettings[key] !== undefined) el.value = displayValue(el, currentGlobalSettings[key]);
     });
   }
 

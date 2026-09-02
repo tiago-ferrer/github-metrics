@@ -19,18 +19,18 @@
     </div>
     <p class="hint">No Windows, se informar um caminho completo, inclua a extensão <code>.exe</code>.</p>
     <div class="field">
-      <label for="refreshIntervalSeconds">Refresh (segundos)</label>
+      <label for="refreshIntervalSeconds">Refresh (minutos)</label>
       <input
         id="refreshIntervalSeconds"
         type="number"
-        min="30"
-        step="10"
-        placeholder="60"
+        min="0.5"
+        step="0.5"
+        placeholder="1"
         data-global-setting="refreshIntervalSeconds"
-        data-type="number"
+        data-type="minutes"
       />
     </div>
-    <p class="hint">Essas configurações são globais e valem para todas as actions do plugin (mínimo 30s).</p>
+    <p class="hint">Essas configurações são globais e valem para todas as actions do plugin (mínimo 0,5 min).</p>
 
     <script src="pi-common.js"></script>
   </body>
