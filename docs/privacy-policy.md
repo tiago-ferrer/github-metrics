@@ -44,4 +44,4 @@ do próprio Stream Deck.
 
 ## Contato
 
-Dúvidas sobre esta política: [preencher e-mail/URL de suporte antes da submissão].
+Dúvidas sobre esta política: contato@tferrer.dev.
